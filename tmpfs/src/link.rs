@@ -24,7 +24,7 @@ impl Link {
         match &self.inode.body.read().await.data {
             Data::File(..) => Err(Error::not_dir()),
 
-            Data::Directory(dir) => Ok(match (name, self.parent.upgrade()) {
+            Data::Dir(dir) => Ok(match (name, self.parent.upgrade()) {
                 ("", _) => Some(self.clone()),
                 (".", _) => Some(self.clone()),
                 ("..", Some(parent)) => Some(parent),
@@ -61,18 +61,18 @@ impl Link {
 
         let filetype = match ilock.data {
             Data::File(..) => FileType::RegularFile,
-            Data::Directory(..) => FileType::Directory,
+            Data::Dir(..) => FileType::Directory,
         };
 
         let nlink = Arc::strong_count(&self.inode) as u64
             * match ilock.data {
-                Data::Directory(..) => 2,
+                Data::Dir(..) => 2,
                 Data::File(..) => 1,
             };
 
         let size = match ilock.data {
             Data::File(ref data) => data.len() as u64,
-            Data::Directory(..) => 0, // FIXME
+            Data::Dir(..) => 0, // FIXME
         };
 
         Filestat {

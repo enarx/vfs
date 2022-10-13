@@ -51,7 +51,7 @@ impl WasiFile for Open {
         }
 
         match &mut self.link.inode.body.write().await.data {
-            Data::Directory(..) => return Err(Error::io()), // FIXME: errorno
+            Data::Dir(..) => return Err(Error::io()), // FIXME: errorno
             Data::File(contents) => contents.resize(size, 0),
         }
 
@@ -96,7 +96,7 @@ impl WasiFile for Open {
         let mut total = 0;
 
         match &self.link.inode.body.read().await.data {
-            Data::Directory(..) => return Err(Error::io()), // FIXME: errorno
+            Data::Dir(..) => return Err(Error::io()), // FIXME: errorno
 
             Data::File(contents) => {
                 for buf in bufs {
@@ -124,7 +124,7 @@ impl WasiFile for Open {
         let mut total = 0;
 
         match &self.link.inode.body.read().await.data {
-            Data::Directory(..) => return Err(Error::io()), // FIXME: errorno
+            Data::Dir(..) => return Err(Error::io()), // FIXME: errorno
 
             Data::File(contents) => {
                 for buf in bufs {
@@ -149,7 +149,7 @@ impl WasiFile for Open {
         let mut total = 0;
 
         match &mut ilock.data {
-            Data::Directory(..) => return Err(Error::io()), // FIXME: errorno
+            Data::Dir(..) => return Err(Error::io()), // FIXME: errorno
 
             Data::File(contents) => {
                 for buf in bufs {
@@ -192,7 +192,7 @@ impl WasiFile for Open {
         let mut total = 0;
 
         match &mut ilock.data {
-            Data::Directory(..) => return Err(Error::io()), // FIXME: errorno
+            Data::Dir(..) => return Err(Error::io()), // FIXME: errorno
 
             Data::File(contents) => {
                 for buf in bufs {
@@ -212,7 +212,7 @@ impl WasiFile for Open {
 
     async fn seek(&mut self, pos: SeekFrom) -> Result<u64, Error> {
         match &self.link.inode.body.read().await.data {
-            Data::Directory(..) => return Err(Error::io()), // FIXME: errorno
+            Data::Dir(..) => return Err(Error::io()), // FIXME: errorno
 
             Data::File(contents) => {
                 let mut olock = self.state.write().await;
@@ -247,7 +247,7 @@ impl WasiFile for Open {
         let mut total = 0;
 
         match &self.link.inode.body.read().await.data {
-            Data::Directory(..) => return Err(Error::io()), // FIXME: errorno
+            Data::Dir(..) => return Err(Error::io()), // FIXME: errorno
 
             Data::File(contents) => {
                 let len = min(buf.len(), contents.len() - olock.pos);
@@ -268,7 +268,7 @@ impl WasiFile for Open {
         let ilock = self.link.inode.body.read().await;
 
         match &ilock.data {
-            Data::Directory(..) => Ok(0),
+            Data::Dir(..) => Ok(0),
             Data::File(contents) => {
                 let len = min(contents.len(), olock.pos);
                 let len = contents.len() - len;

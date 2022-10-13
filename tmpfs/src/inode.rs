@@ -10,14 +10,14 @@ use wasmtime_vfs_ledger::InodeId;
 use super::link::Link;
 
 pub enum Data {
-    Directory(BTreeMap<String, Arc<Link>>),
+    Dir(BTreeMap<String, Arc<Link>>),
     File(Vec<u8>),
 }
 
 impl Data {
     pub fn filetype(&self) -> FileType {
         match self {
-            Self::Directory(..) => FileType::Directory,
+            Self::Dir(..) => FileType::Directory,
             Self::File(..) => FileType::RegularFile,
         }
     }

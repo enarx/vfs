@@ -15,7 +15,7 @@ impl From<Arc<Ledger>> for Builder {
         Self(Arc::new(Link {
             parent: Weak::new(),
             inode: Arc::new(Inode {
-                body: Body::from(Data::Directory(BTreeMap::new())).into(),
+                body: Body::from(Data::Dir(BTreeMap::new())).into(),
                 id: ledger.create_device().create_inode(),
             }),
         }))
@@ -33,12 +33,12 @@ impl Builder {
 
             name => match &mut parent.inode.body.write().await.data {
                 Data::File(..) => Err(Error::not_dir()),
-                Data::Directory(dir) => match dir.get(name) {
+                Data::Dir(dir) => match dir.get(name) {
                     Some(..) => Err(Error::exist()),
                     None => {
                         let data = match data.into() {
                             Some(content) => Data::File(content),
-                            None => Data::Directory(BTreeMap::new()),
+                            None => Data::Dir(BTreeMap::new()),
                         };
 
                         let inode = Arc::new(Inode {

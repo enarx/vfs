@@ -73,7 +73,7 @@ impl WasiDir for Open {
 
             name => match &mut ilock.data {
                 Data::File(_) => Err(Error::not_dir()),
-                Data::Directory(dir) => match (dir.get(name), oflags.contains(OFlags::CREATE)) {
+                Data::Dir(dir) => match (dir.get(name), oflags.contains(OFlags::CREATE)) {
                     // If the file exists and we're creating it, then we have an error.
                     (Some(_), true) if oflags.contains(OFlags::EXCLUSIVE) => Err(Error::exist()),
 
@@ -87,7 +87,7 @@ impl WasiDir for Open {
                             inode: Arc::new(Inode {
                                 id: self.link.inode.id.device().create_inode(),
                                 body: match oflags.contains(OFlags::DIRECTORY) {
-                                    true => Body::from(Data::Directory(BTreeMap::new())).into(),
+                                    true => Body::from(Data::Dir(BTreeMap::new())).into(),
                                     false => Body::from(Data::File(Vec::new())).into(),
                                 },
                             }),
@@ -102,7 +102,7 @@ impl WasiDir for Open {
                         let mut ilock = child.inode.body.write().await;
 
                         match &mut ilock.data {
-                            Data::Directory(_) => return Err(Error::io()), // FIXME
+                            Data::Dir(_) => return Err(Error::io()), // FIXME
                             Data::File(_) => ilock.data = Data::File(Vec::new()),
                         }
 
@@ -112,7 +112,7 @@ impl WasiDir for Open {
                     // Open the directory.
                     (Some(child), _) if oflags.contains(OFlags::DIRECTORY) => {
                         match &child.inode.body.read().await.data {
-                            Data::Directory(..) => Ok(child.clone()),
+                            Data::Dir(..) => Ok(child.clone()),
                             Data::File(..) => Err(Error::not_dir()),
                         }
                     }
@@ -134,7 +134,7 @@ impl WasiDir for Open {
         // Open the directory.
         let ilock = dir.inode.body.read().await;
         match &ilock.data {
-            Data::Directory(..) => Ok(Box::new(Open::from(&dir))),
+            Data::Dir(..) => Ok(Box::new(Open::from(&dir))),
             Data::File(..) => Err(Error::not_dir()),
         }
     }
@@ -144,13 +144,13 @@ impl WasiDir for Open {
         let mut ilock = parent.inode.body.write().await;
         match &mut ilock.data {
             Data::File(..) => Err(Error::not_dir()),
-            Data::Directory(dir) if dir.contains_key(name) => Err(Error::exist()),
-            Data::Directory(dir) => {
+            Data::Dir(dir) if dir.contains_key(name) => Err(Error::exist()),
+            Data::Dir(dir) => {
                 let child = Arc::new(Link {
                     parent: Arc::downgrade(&parent),
                     inode: Arc::new(Inode {
                         id: parent.inode.id.device().create_inode(),
-                        body: Body::from(Data::Directory(BTreeMap::new())).into(),
+                        body: Body::from(Data::Dir(BTreeMap::new())).into(),
                     }),
                 });
 
@@ -171,7 +171,7 @@ impl WasiDir for Open {
         // Get the directory reference.
         let ilock = self.link.inode.body.read().await;
         let dir = match &ilock.data {
-            Data::Directory(dir) => Ok(dir),
+            Data::Dir(dir) => Ok(dir),
             Data::File(..) => Err(Error::not_dir()),
         }?;
 
@@ -197,7 +197,7 @@ impl WasiDir for Open {
         for (i, (k, v)) in dir.iter().enumerate() {
             entries.push(Ok(ReaddirEntity {
                 filetype: match v.inode.body.read().await.data {
-                    Data::Directory(..) => FileType::Directory,
+                    Data::Dir(..) => FileType::Directory,
                     Data::File(..) => FileType::RegularFile,
                 },
                 inode: *v.inode.id,
@@ -230,10 +230,10 @@ impl WasiDir for Open {
 
         match &clock.data {
             Data::File(..) => Err(Error::not_dir()),
-            Data::Directory(dir) if !dir.is_empty() => Err(Error::io()), // FIXME
-            Data::Directory(..) => {
+            Data::Dir(dir) if !dir.is_empty() => Err(Error::io()), // FIXME
+            Data::Dir(..) => {
                 let dir = match &mut plock.data {
-                    Data::Directory(dir) => dir,
+                    Data::Dir(dir) => dir,
                     Data::File(..) => return Err(Error::not_dir()),
                 };
 
@@ -259,7 +259,7 @@ impl WasiDir for Open {
         let clock = child.inode.body.read().await;
 
         match (&mut plock.data, &clock.data) {
-            (Data::Directory(dir), Data::File(..)) => {
+            (Data::Dir(dir), Data::File(..)) => {
                 dir.remove(name);
                 Ok(())
             }
