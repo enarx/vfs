@@ -15,7 +15,7 @@ impl From<Arc<Ledger>> for Builder {
         Self(Arc::new(Link {
             parent: Weak::new(),
             inode: Arc::new(Inode {
-                body: Body::from(BTreeMap::new()).into(),
+                body: Body::from(Data::Directory(BTreeMap::new())).into(),
                 id: ledger.create_device().create_inode(),
             }),
         }))

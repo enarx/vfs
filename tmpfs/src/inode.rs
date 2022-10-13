@@ -14,18 +14,6 @@ pub enum Data {
     File(Vec<u8>),
 }
 
-impl From<BTreeMap<String, Arc<Link>>> for Data {
-    fn from(directory: BTreeMap<String, Arc<Link>>) -> Self {
-        Self::Directory(directory)
-    }
-}
-
-impl From<Vec<u8>> for Data {
-    fn from(file: Vec<u8>) -> Self {
-        Self::File(file)
-    }
-}
-
 impl Data {
     pub fn filetype(&self) -> FileType {
         match self {
@@ -64,18 +52,6 @@ impl From<Data> for Body {
             meta: Meta::default(),
             data,
         }
-    }
-}
-
-impl From<BTreeMap<String, Arc<Link>>> for Body {
-    fn from(directory: BTreeMap<String, Arc<Link>>) -> Self {
-        Data::from(directory).into()
-    }
-}
-
-impl From<Vec<u8>> for Body {
-    fn from(file: Vec<u8>) -> Self {
-        Data::from(file).into()
     }
 }
 

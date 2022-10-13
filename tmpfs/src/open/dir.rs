@@ -87,8 +87,8 @@ impl WasiDir for Open {
                             inode: Arc::new(Inode {
                                 id: self.link.inode.id.device().create_inode(),
                                 body: match oflags.contains(OFlags::DIRECTORY) {
-                                    true => Body::from(BTreeMap::new()).into(),
-                                    false => Body::from(Vec::new()).into(),
+                                    true => Body::from(Data::Directory(BTreeMap::new())).into(),
+                                    false => Body::from(Data::File(Vec::new())).into(),
                                 },
                             }),
                         });
@@ -103,7 +103,7 @@ impl WasiDir for Open {
 
                         match &mut ilock.data {
                             Data::Directory(_) => return Err(Error::io()), // FIXME
-                            Data::File(_) => ilock.data = Vec::new().into(),
+                            Data::File(_) => ilock.data = Data::File(Vec::new()),
                         }
 
                         Ok(child.clone())
@@ -150,7 +150,7 @@ impl WasiDir for Open {
                     parent: Arc::downgrade(&parent),
                     inode: Arc::new(Inode {
                         id: parent.inode.id.device().create_inode(),
-                        body: Body::from(BTreeMap::new()).into(),
+                        body: Body::from(Data::Directory(BTreeMap::new())).into(),
                     }),
                 });
 
