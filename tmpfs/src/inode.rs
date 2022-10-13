@@ -5,9 +5,9 @@ use std::time::SystemTime;
 use tokio::sync::RwLock;
 use wasi_common::file::FileType;
 use wasi_common::{Error, SystemTimeSpec};
+use wasmtime_vfs_ledger::InodeId;
 
 use super::link::Link;
-use crate::InodeId;
 
 pub enum Data {
     Directory(BTreeMap<String, Arc<Link>>),

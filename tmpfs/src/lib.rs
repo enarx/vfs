@@ -9,10 +9,11 @@ pub use builder::Builder;
 mod test {
     use std::io::IoSliceMut;
 
-    use super::builder::Builder;
-    use crate::Ledger;
     use wasi_common::file::{FdFlags, FileType, OFlags};
     use wasi_common::Error;
+    use wasmtime_vfs_ledger::Ledger;
+
+    use super::builder::Builder;
 
     #[tokio::test]
     async fn test() -> Result<(), Error> {

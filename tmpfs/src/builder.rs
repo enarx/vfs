@@ -2,11 +2,11 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
 
 use wasi_common::{Error, ErrorExt, WasiDir};
+use wasmtime_vfs_ledger::Ledger;
 
 use super::inode::{Body, Data, Inode};
 use super::link::Link;
 use super::open::Open;
-use crate::Ledger;
 
 pub struct Builder(Arc<Link>);
 

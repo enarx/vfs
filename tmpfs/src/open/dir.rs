@@ -7,11 +7,9 @@ use wasi_common::dir::{ReaddirCursor, ReaddirEntity};
 use wasi_common::file::{FdFlags, FileType, Filestat, OFlags};
 use wasi_common::{Error, ErrorExt, SystemTimeSpec, WasiDir, WasiFile};
 
-use crate::tmpfs::inode::{Body, Inode};
-use crate::tmpfs::link::Link;
-
-use super::super::inode::Data;
 use super::Open;
+use crate::inode::{Body, Data, Inode};
+use crate::link::Link;
 
 const VALID_OFLAGS: &[u32] = &[
     OFlags::empty().bits(),
