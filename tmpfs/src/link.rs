@@ -81,9 +81,9 @@ impl Link {
             filetype,
             nlink,
             size,
-            atim: Some(ilock.meta.atime),
-            mtim: Some(ilock.meta.mtime),
-            ctim: Some(ilock.meta.ctime),
+            atim: Some(ilock.meta.access),
+            mtim: Some(ilock.meta.modify),
+            ctim: Some(ilock.meta.create),
         }
     }
 }

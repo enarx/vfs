@@ -36,9 +36,9 @@ impl Data {
 }
 
 pub struct Meta {
-    pub ctime: SystemTime,
-    pub atime: SystemTime,
-    pub mtime: SystemTime,
+    pub create: SystemTime,
+    pub access: SystemTime,
+    pub modify: SystemTime,
 }
 
 impl Default for Meta {
@@ -46,9 +46,9 @@ impl Default for Meta {
         let now = SystemTime::now();
 
         Self {
-            ctime: now,
-            atime: now,
-            mtime: now,
+            create: now,
+            access: now,
+            modify: now,
         }
     }
 }
@@ -106,7 +106,7 @@ impl Inode {
 
         // Set the access time if requested.
         if let Some(atime) = atime {
-            lock.meta.atime = match atime {
+            lock.meta.access = match atime {
                 SystemTimeSpec::SymbolicNow => now.unwrap(),
                 SystemTimeSpec::Absolute(time) => time.into_std(),
             };
@@ -114,7 +114,7 @@ impl Inode {
 
         // Set the modification time if requested.
         if let Some(mtime) = mtime {
-            lock.meta.mtime = match mtime {
+            lock.meta.modify = match mtime {
                 SystemTimeSpec::SymbolicNow => now.unwrap(),
                 SystemTimeSpec::Absolute(time) => time.into_std(),
             };
