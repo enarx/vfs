@@ -1,8 +1,13 @@
+use std::collections::BTreeMap;
 use std::path::MAIN_SEPARATOR as SEP;
 use std::sync::{Arc, Weak};
 
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use wasi_common::file::{FileType, Filestat};
 use wasi_common::{Error, ErrorExt};
+use wasmtime_vfs_ledger::Ledger;
+
+use crate::inode::Body;
 
 use super::inode::{Data, Inode};
 
@@ -12,6 +17,26 @@ pub struct Link {
 }
 
 impl Link {
+    pub fn root(ledger: Arc<Ledger>) -> Self {
+        let inode = Inode {
+            id: ledger.create_device().create_inode(),
+            body: RwLock::new(Data::Dir(BTreeMap::new()).into()),
+        };
+
+        Self {
+            parent: Weak::<Self>::new(),
+            inode: inode.into(),
+        }
+    }
+
+    pub async fn read(&self) -> RwLockReadGuard<'_, Body> {
+        self.inode.body.read().await
+    }
+
+    pub async fn write(&self) -> RwLockWriteGuard<'_, Body> {
+        self.inode.body.write().await
+    }
+
     pub fn parent(self: &Arc<Self>) -> Result<Arc<Link>, Error> {
         self.parent.upgrade().ok_or_else(Error::not_found)
     }
