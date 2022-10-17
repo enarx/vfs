@@ -61,8 +61,8 @@ impl DeviceId {
     }
 
     /// Allocate a new inode.
-    pub fn create_inode(self: Arc<Self>) -> InodeId {
-        InodeId {
+    pub fn create_inode(self: Arc<Self>) -> Arc<InodeId> {
+        Arc::new(InodeId {
             id: {
                 let (free, next) = &mut *self.inodes.lock().unwrap();
                 let id = free.iter().cloned().chain(next).next().expect("out of ids");
@@ -70,7 +70,7 @@ impl DeviceId {
                 id
             },
             device: self,
-        }
+        })
     }
 }
 

@@ -57,7 +57,7 @@ impl From<Data> for Body {
 
 pub struct Inode {
     pub body: RwLock<Body>,
-    pub id: InodeId,
+    pub id: Arc<InodeId>,
 }
 
 impl Inode {

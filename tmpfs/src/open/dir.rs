@@ -178,7 +178,7 @@ impl WasiDir for Open {
         // Add the single dot entry.
         let mut entries = vec![Ok(ReaddirEntity {
             filetype: FileType::Directory,
-            inode: *self.link.inode.id,
+            inode: **self.link.inode.id,
             name: ".".to_string(),
             next: 1.into(),
         })];
@@ -187,7 +187,7 @@ impl WasiDir for Open {
         if let Some(parent) = self.link.parent.upgrade() {
             entries.push(Ok(ReaddirEntity {
                 filetype: FileType::Directory,
-                inode: *parent.inode.id,
+                inode: **parent.inode.id,
                 name: "..".to_string(),
                 next: 2.into(),
             }));
@@ -200,7 +200,7 @@ impl WasiDir for Open {
                     Data::Dir(..) => FileType::Directory,
                     Data::File(..) => FileType::RegularFile,
                 },
-                inode: *v.inode.id,
+                inode: **v.inode.id,
                 name: k.to_string(),
                 next: (i as u64 + entries.len() as u64 + 1).into(),
             }));

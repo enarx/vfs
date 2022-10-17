@@ -102,7 +102,7 @@ impl Link {
 
         Filestat {
             device_id: **self.inode.id.device(),
-            inode: *self.inode.id,
+            inode: **self.inode.id,
             filetype,
             nlink,
             size,
