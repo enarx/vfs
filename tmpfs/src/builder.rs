@@ -1,65 +1,40 @@
-use std::collections::BTreeMap;
-use std::sync::{Arc, Weak};
+use std::io::IoSlice;
+use std::sync::Arc;
 
+use wasi_common::file::{FdFlags, OFlags};
 use wasi_common::{Error, ErrorExt, WasiDir};
 use wasmtime_vfs_ledger::Ledger;
 
-use super::inode::{Body, Data, Inode};
 use super::link::Link;
 use super::open::Open;
 
-pub struct Builder(Arc<Link>);
+pub struct Builder(Box<dyn WasiDir>);
 
 impl From<Arc<Ledger>> for Builder {
     fn from(ledger: Arc<Ledger>) -> Self {
-        Self(Arc::new(Link {
-            parent: Weak::new(),
-            inode: Arc::new(Inode {
-                body: Body::from(Data::Dir(BTreeMap::new())).into(),
-                id: ledger.create_device().create_inode(),
-            }),
-        }))
+        Self(Open::dir(Link::new(ledger).into()))
     }
 }
 
 impl Builder {
     pub async fn add(self, path: &str, data: impl Into<Option<Vec<u8>>>) -> Result<Self, Error> {
-        let (parent, child) = self.0.walk(false, path).await?;
-
-        match child {
-            "" => Err(Error::invalid_argument()),
-            "." => Err(Error::invalid_argument()),
-            ".." => Err(Error::invalid_argument()),
-
-            name => match &mut parent.inode.body.write().await.data {
-                Data::File(..) => Err(Error::not_dir()),
-                Data::Dir(dir) => match dir.get(name) {
-                    Some(..) => Err(Error::exist()),
-                    None => {
-                        let data = match data.into() {
-                            Some(content) => Data::File(content),
-                            None => Data::Dir(BTreeMap::new()),
-                        };
-
-                        let inode = Arc::new(Inode {
-                            body: Body::from(data).into(),
-                            id: parent.inode.id.device().create_inode(),
-                        });
-
-                        let link = Arc::new(Link {
-                            parent: Arc::downgrade(&parent),
-                            inode,
-                        });
-
-                        dir.insert(name.to_string(), link);
-                        Ok(self)
-                    }
-                },
-            },
+        match data.into() {
+            None => self.0.create_dir(path).await?,
+            Some(data) => {
+                let of = OFlags::CREATE | OFlags::EXCLUSIVE;
+                let f = FdFlags::empty();
+                let mut file = self.0.open_file(true, path, of, true, true, f).await?;
+                let bufs = IoSlice::new(&data);
+                if file.write_vectored(&[bufs]).await? != data.len() as u64 {
+                    return Err(Error::io()); // FIXME
+                }
+            }
         }
+
+        Ok(self)
     }
 
     pub fn build(self) -> Box<dyn WasiDir> {
-        Box::new(Open::from(self.0))
+        self.0
     }
 }

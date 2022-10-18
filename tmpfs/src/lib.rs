@@ -1,6 +1,7 @@
 mod builder;
 mod inode;
 mod link;
+mod node;
 mod open;
 
 pub use builder::Builder;
@@ -42,17 +43,21 @@ mod test {
         assert_eq!(top[0].as_ref().unwrap().filetype, FileType::Directory);
         assert_eq!(top[0].as_ref().unwrap().inode, 0);
 
-        assert_eq!(top[1].as_ref().unwrap().name, "ack");
+        assert_eq!(top[1].as_ref().unwrap().name, "..");
         assert_eq!(top[1].as_ref().unwrap().filetype, FileType::Directory);
-        assert_eq!(top[1].as_ref().unwrap().inode, 6);
+        assert_eq!(top[1].as_ref().unwrap().inode, 0);
 
-        assert_eq!(top[2].as_ref().unwrap().name, "foo");
+        assert_eq!(top[2].as_ref().unwrap().name, "ack");
         assert_eq!(top[2].as_ref().unwrap().filetype, FileType::Directory);
-        assert_eq!(top[2].as_ref().unwrap().inode, 1);
+        assert_eq!(top[2].as_ref().unwrap().inode, 6);
 
-        assert_eq!(top[3].as_ref().unwrap().name, "zip");
-        assert_eq!(top[3].as_ref().unwrap().filetype, FileType::RegularFile);
-        assert_eq!(top[3].as_ref().unwrap().inode, 8);
+        assert_eq!(top[3].as_ref().unwrap().name, "foo");
+        assert_eq!(top[3].as_ref().unwrap().filetype, FileType::Directory);
+        assert_eq!(top[3].as_ref().unwrap().inode, 1);
+
+        assert_eq!(top[4].as_ref().unwrap().name, "zip");
+        assert_eq!(top[4].as_ref().unwrap().filetype, FileType::RegularFile);
+        assert_eq!(top[4].as_ref().unwrap().inode, 8);
 
         let foo = treefs.open_dir(false, "foo").await.unwrap();
         let foo: Vec<Result<_, _>> = foo.readdir(0.into()).await.unwrap().collect();
