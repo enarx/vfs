@@ -32,7 +32,7 @@ fn wash<I: Read + Sync + Send + 'static>(
             .stderr(Box::new(stderr.clone()))
             .build();
         ctx.push_preopened_dir(dir, "/")
-            .with_context(|| format!("failed to push directory"))?;
+            .context("failed to push directory")?;
 
         let mut store = Store::new(&engine, ctx);
         linker
