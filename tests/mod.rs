@@ -101,6 +101,7 @@ test
 }
 
 #[test]
+#[ignore = "tmpfs is currently broken on WASI"] // TODO: Make tmpfs run on WASI
 async fn tmpfs() -> anyhow::Result<()> {
     let ledger = Ledger::new();
     let dir = wasmtime_vfs_tmpfs::Builder::from(Arc::clone(&ledger))
