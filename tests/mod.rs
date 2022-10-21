@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::Read;
-use std::sync::Arc;
 
 use anyhow::{bail, Context};
 use tempfile::tempdir;
