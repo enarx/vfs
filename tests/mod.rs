@@ -101,7 +101,6 @@ test
 }
 
 #[test]
-#[ignore = "tmpfs is currently broken on WASI"] // TODO: Make tmpfs run on WASI
 async fn tmpfs() -> anyhow::Result<()> {
     let ledger = Ledger::new();
     let dir = wasmtime_vfs_tmpfs::Builder::from(Arc::clone(&ledger))
@@ -111,10 +110,10 @@ async fn tmpfs() -> anyhow::Result<()> {
         .add("dir", None)
         .await
         .context("failed to add `/dir/` to tmpfs")?
-        .add("dir/file", Some(b"file".to_vec()))
+        .add("dir/a.file", Some(b"file".to_vec()))
         .await
         .context("failed to add `/dir/file` to tmpfs")?
-        .add("dir/dir", None)
+        .add("dir/b.dir", None)
         .await
         .context("failed to add `/dir/dir/` to tmpfs")?
         .build();
@@ -122,7 +121,9 @@ async fn tmpfs() -> anyhow::Result<()> {
         dir,
         r#"ls /
 echo 'test' > test
+ls /
 cat test
+ls /dir
 exit
 "#,
     )
@@ -132,8 +133,10 @@ exit
     let err = String::from_utf8_lossy(&err);
     assert_eq!(
         out,
-        r#"
+        r#"dir file
+dir file test
 test
+a.file b.dir
 "#,
         "{err}"
     );
