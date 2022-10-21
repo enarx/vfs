@@ -1,11 +1,7 @@
 version: 2
 updates:
 - package-ecosystem: "cargo"
-  directory: "/ledger"
-  schedule:
-    interval: "daily"
-- package-ecosystem: "cargo"
-  directory: "/tmpfs"
+  directory: "/"
   schedule:
     interval: "daily"
 - package-ecosystem: "github-actions"
