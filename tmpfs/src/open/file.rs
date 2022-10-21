@@ -3,39 +3,10 @@ use std::cmp::min;
 use std::io::{IoSlice, IoSliceMut, SeekFrom};
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
 use wasi_common::file::{Advice, FdFlags, FileType, Filestat};
 use wasi_common::{Error, ErrorExt, ErrorKind, SystemTimeSpec, WasiFile};
 
-use crate::link::Link;
-use crate::node::Node;
-
-use super::Open;
-
-pub struct State {
-    flags: FdFlags,
-    pos: usize,
-}
-
-pub struct Data {
-    state: RwLock<State>,
-    write: bool,
-    read: bool,
-}
-
-impl Open<Vec<u8>, Data> {
-    pub fn file(link: Arc<Link<Vec<u8>>>, read: bool, write: bool, flags: FdFlags) -> Box<Self> {
-        Box::new(Self {
-            _root: link.clone().root(),
-            link,
-            data: Data {
-                state: RwLock::new(State { flags, pos: 0 }),
-                write,
-                read,
-            },
-        })
-    }
-}
+use super::{Data, Open};
 
 #[async_trait::async_trait]
 impl WasiFile for Open<Vec<u8>, Data> {
@@ -134,7 +105,7 @@ impl WasiFile for Open<Vec<u8>, Data> {
         let ilock = self.link.inode.data.read().await;
         for buf in bufs {
             let len = min(buf.len(), ilock.content.len() - olock.pos);
-            buf.copy_from_slice(&ilock.content[olock.pos..][..len]);
+            buf[..len].copy_from_slice(&ilock.content[olock.pos..][..len]);
             total += len as u64;
             olock.pos += len;
         }
@@ -157,7 +128,7 @@ impl WasiFile for Open<Vec<u8>, Data> {
         let data = &self.link.inode.data.read().await.content[..];
         for buf in bufs {
             let len = min(buf.len(), data.len() - position);
-            buf.copy_from_slice(&data[position..][..len]);
+            buf[..len].copy_from_slice(&data[position..][..len]);
             total += len as u64;
             position += len;
         }
@@ -257,7 +228,7 @@ impl WasiFile for Open<Vec<u8>, Data> {
         let olock = self.data.state.read().await;
         let ilock = self.link.inode.data.read().await;
         let len = min(buf.len(), ilock.content.len() - olock.pos);
-        buf.copy_from_slice(&ilock.content[olock.pos..][..len]);
+        buf[..len].copy_from_slice(&ilock.content[olock.pos..][..len]);
         total += len as u64;
 
         Ok(total)

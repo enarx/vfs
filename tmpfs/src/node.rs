@@ -66,11 +66,11 @@ impl Node for Link<BTreeMap<String, Arc<dyn Node>>> {
     async fn open_file(
         self: Arc<Self>,
         _dir: bool,
-        _read: bool,
-        _write: bool,
-        _flags: FdFlags,
+        read: bool,
+        write: bool,
+        flags: FdFlags,
     ) -> Result<Box<dyn WasiFile>, Error> {
-        Err(Error::io()) // FIXME
+        Ok(Open::file(self, read, write, flags))
     }
 }
 

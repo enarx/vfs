@@ -1,13 +1,13 @@
 use std::any::Any;
 use std::collections::BTreeMap;
+use std::io::{IoSlice, IoSliceMut, SeekFrom};
 use std::path::{PathBuf, MAIN_SEPARATOR as SEP};
 use std::sync::Arc;
 
 use wasi_common::dir::{ReaddirCursor, ReaddirEntity};
-use wasi_common::file::{FdFlags, FileType, Filestat, OFlags};
+use wasi_common::file::{Advice, FdFlags, FileType, Filestat, OFlags};
 use wasi_common::{Error, ErrorExt, SystemTimeSpec, WasiDir, WasiFile};
 
-use super::Open;
 use crate::inode::{Data, Inode};
 use crate::link::Link;
 use crate::node::Node;
@@ -34,18 +34,8 @@ impl Link<BTreeMap<String, Arc<dyn Node>>> {
     }
 }
 
-impl Open<BTreeMap<String, Arc<dyn Node>>, ()> {
-    pub fn dir(link: Arc<Link<BTreeMap<String, Arc<dyn Node>>>>) -> Box<Self> {
-        Box::new(Self {
-            _root: link.clone().root(),
-            link,
-            data: (),
-        })
-    }
-}
-
 #[async_trait::async_trait]
-impl WasiDir for Open<BTreeMap<String, Arc<dyn Node>>, ()> {
+impl WasiDir for super::Open<BTreeMap<String, Arc<dyn Node>>, ()> {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -66,6 +56,7 @@ impl WasiDir for Open<BTreeMap<String, Arc<dyn Node>>, ()> {
             OFlags::TRUNCATE.bits(),
             OFlags::CREATE.bits() | OFlags::DIRECTORY.bits(),
             OFlags::CREATE.bits() | OFlags::EXCLUSIVE.bits(),
+            OFlags::CREATE.bits() | OFlags::TRUNCATE.bits(),
             OFlags::CREATE.bits() | OFlags::DIRECTORY.bits() | OFlags::EXCLUSIVE.bits(),
         ];
 
@@ -379,5 +370,118 @@ impl WasiDir for Open<BTreeMap<String, Arc<dyn Node>>, ()> {
                 file.set_times(atime, mtime).await
             }
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl WasiFile for super::Open<BTreeMap<String, Arc<dyn Node>>, super::Data> {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    async fn get_filetype(&mut self) -> Result<FileType, Error> {
+        Ok(FileType::Directory)
+    }
+
+    async fn datasync(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn sync(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn get_fdflags(&mut self) -> Result<FdFlags, Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn set_fdflags(&mut self, _flags: FdFlags) -> Result<(), Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn get_filestat(&mut self) -> Result<Filestat, Error> {
+        let ilock = self.link.inode.data.read().await;
+
+        Ok(Filestat {
+            device_id: **self.link.inode.id.device(),
+            inode: **self.link.inode.id,
+            filetype: FileType::Directory,
+            nlink: Arc::strong_count(&self.link.inode) as u64,
+            size: ilock.content.len() as u64,
+            atim: Some(ilock.access),
+            mtim: Some(ilock.modify),
+            ctim: Some(ilock.create),
+        })
+    }
+
+    async fn set_filestat_size(&mut self, _size: u64) -> Result<(), Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn advise(&mut self, _offset: u64, _len: u64, _advice: Advice) -> Result<(), Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn allocate(&mut self, _offset: u64, _len: u64) -> Result<(), Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn set_times(
+        &mut self,
+        atime: Option<SystemTimeSpec>,
+        mtime: Option<SystemTimeSpec>,
+    ) -> Result<(), Error> {
+        if !self.data.write {
+            return Err(Error::io()); // FIXME: errorno
+        }
+
+        self.link.inode.data.write().await.set_times(atime, mtime)
+    }
+
+    async fn read_vectored<'a>(&mut self, _bufs: &mut [IoSliceMut<'a>]) -> Result<u64, Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn read_vectored_at<'a>(
+        &mut self,
+        _bufs: &mut [IoSliceMut<'a>],
+        _offset: u64,
+    ) -> Result<u64, Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn write_vectored<'a>(&mut self, _bufs: &[IoSlice<'a>]) -> Result<u64, Error> {
+        Err(Error::not_supported())
+    }
+
+    // FIXME: we need to decide on a behavior for O_APPEND. WASI doesn't
+    // specify a behavior. POSIX defines one behavior. Linux has a different
+    // one. See: https://linux.die.net/man/2/pwrite
+    async fn write_vectored_at<'a>(
+        &mut self,
+        _bufs: &[IoSlice<'a>],
+        _offset: u64,
+    ) -> Result<u64, Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn seek(&mut self, _pos: SeekFrom) -> Result<u64, Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn peek(&mut self, _buf: &mut [u8]) -> Result<u64, Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn num_ready_bytes(&self) -> Result<u64, Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn readable(&self) -> Result<(), Error> {
+        Err(Error::not_supported())
+    }
+
+    async fn writable(&self) -> Result<(), Error> {
+        Err(Error::not_supported())
     }
 }
