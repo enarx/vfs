@@ -5,6 +5,9 @@ edition = "2021"
 
 [dev-dependencies]
 anyhow = "1.0.65"
+async-trait = "0.1.51"
+rustix = "0.35.11"
+serial_test = "0.9.0"
 tempfile = "3.3.0"
 tokio = { version = "1.21.2", features = [ "rt-multi-thread", "macros" ] }
 wash = { version = "0.1.0", git = "https://github.com/rvolosatovs/wash", artifact = "bin", target = "wasm32-wasi", default-features = false }
@@ -13,6 +16,9 @@ wasmtime = "1.0.1"
 wasmtime-vfs-ledger = { path = "./ledger" }
 wasmtime-vfs-tmpfs = { path = "./tmpfs" }
 wasmtime-wasi = "1.0.1"
+
+[features]
+interactive = []
 
 [workspace]
 members = ["tmpfs", "ledger"]
