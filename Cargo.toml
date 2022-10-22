@@ -21,4 +21,4 @@ wasmtime-wasi = "2.0.0"
 interactive = []
 
 [workspace]
-members = ["tmpfs", "ledger"]
+members = ["tmpfs", "ledger", "memory"]

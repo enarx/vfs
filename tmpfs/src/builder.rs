@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::io::IoSlice;
 use std::sync::Arc;
 
@@ -6,16 +5,20 @@ use wasi_common::file::{FdFlags, OFlags};
 use wasi_common::{Error, ErrorExt, WasiDir};
 use wasmtime_vfs_ledger::Ledger;
 
-use super::link::Link;
-use super::node::Node;
-use super::open::Open;
+use crate::{Directory, Open};
 
 pub struct Builder(Box<dyn WasiDir>);
 
 impl From<Arc<Ledger>> for Builder {
     fn from(ledger: Arc<Ledger>) -> Self {
-        type Dir = BTreeMap<String, Arc<dyn Node>>;
-        Self(Open::dir(Link::<Dir>::new(ledger).into()))
+        let root = Directory::root(ledger);
+        Self(Box::new(Open {
+            _root: root.clone(),
+            link: root,
+            state: Default::default(),
+            write: false,
+            read: false,
+        }))
     }
 }
 

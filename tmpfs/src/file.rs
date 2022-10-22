@@ -1,15 +1,93 @@
 use std::any::Any;
 use std::cmp::min;
 use std::io::{IoSlice, IoSliceMut, SeekFrom};
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
+use wasi_common::dir::{ReaddirCursor, ReaddirEntity};
 use wasi_common::file::{Advice, FdFlags, FileType, Filestat};
-use wasi_common::{Error, ErrorExt, ErrorKind, SystemTimeSpec, WasiFile};
+use wasi_common::{Error, ErrorExt, ErrorKind, SystemTimeSpec, WasiDir, WasiFile};
+use wasmtime_vfs_ledger::InodeId;
+use wasmtime_vfs_memory::{Inode, Link, Node};
 
-use super::{Data, Open};
+use super::{Open, State};
+
+pub struct File(Link<Vec<u8>>);
+
+impl Deref for File {
+    type Target = Link<Vec<u8>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for File {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 #[async_trait::async_trait]
-impl WasiFile for Open<Vec<u8>, Data> {
+impl Node for File {
+    fn parent(&self) -> Option<Arc<dyn Node>> {
+        self.parent.upgrade()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn id(&self) -> Arc<InodeId> {
+        self.inode.id.clone()
+    }
+
+    fn entity(&self, name: String, next: ReaddirCursor) -> ReaddirEntity {
+        ReaddirEntity {
+            name,
+            filetype: FileType::RegularFile,
+            inode: **self.inode.id,
+            next,
+        }
+    }
+
+    async fn open_dir(self: Arc<Self>) -> Result<Box<dyn WasiDir>, Error> {
+        Err(Error::not_dir())
+    }
+
+    async fn open_file(
+        self: Arc<Self>,
+        dir: bool,
+        read: bool,
+        write: bool,
+        flags: FdFlags,
+    ) -> Result<Box<dyn WasiFile>, Error> {
+        if dir {
+            return Err(Error::not_dir());
+        }
+
+        Ok(Box::new(Open {
+            _root: self.root(),
+            link: self,
+            state: State::from(flags).into(),
+            write,
+            read,
+        }))
+    }
+}
+
+impl File {
+    pub(crate) fn new(parent: Arc<dyn Node>) -> Arc<Self> {
+        let id = parent.id().device().create_inode();
+        Arc::new(Self(Link {
+            parent: Arc::downgrade(&parent),
+            inode: Inode::from(id).into(),
+        }))
+    }
+}
+
+#[async_trait::async_trait]
+impl WasiFile for Open<File> {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -27,15 +105,15 @@ impl WasiFile for Open<Vec<u8>, Data> {
     }
 
     async fn get_fdflags(&mut self) -> Result<FdFlags, Error> {
-        Ok(self.data.state.read().await.flags)
+        Ok(self.state.read().await.flags)
     }
 
     async fn set_fdflags(&mut self, flags: FdFlags) -> Result<(), Error> {
-        if !self.data.write {
+        if !self.write {
             return Err(Error::io()); // FIXME: errorno
         }
 
-        self.data.state.write().await.flags = flags;
+        self.state.write().await.flags = flags;
         Ok(())
     }
 
@@ -57,7 +135,7 @@ impl WasiFile for Open<Vec<u8>, Data> {
     async fn set_filestat_size(&mut self, size: u64) -> Result<(), Error> {
         let size: usize = size.try_into().map_err(|_| Error::invalid_argument())?;
 
-        if !self.data.write {
+        if !self.write {
             return Err(Error::io()); // FIXME: errorno
         }
 
@@ -70,7 +148,7 @@ impl WasiFile for Open<Vec<u8>, Data> {
     }
 
     async fn allocate(&mut self, offset: u64, len: u64) -> Result<(), Error> {
-        if !self.data.write {
+        if !self.write {
             return Err(Error::io()); // FIXME: errorno
         }
 
@@ -87,7 +165,7 @@ impl WasiFile for Open<Vec<u8>, Data> {
         atime: Option<SystemTimeSpec>,
         mtime: Option<SystemTimeSpec>,
     ) -> Result<(), Error> {
-        if !self.data.write {
+        if !self.write {
             return Err(Error::io()); // FIXME: errorno
         }
 
@@ -95,13 +173,13 @@ impl WasiFile for Open<Vec<u8>, Data> {
     }
 
     async fn read_vectored<'a>(&mut self, bufs: &mut [IoSliceMut<'a>]) -> Result<u64, Error> {
-        if !self.data.read {
+        if !self.read {
             return Err(Error::io()); // FIXME: errorno
         }
 
         let mut total = 0;
 
-        let mut olock = self.data.state.write().await;
+        let mut olock = self.state.write().await;
         let ilock = self.link.inode.data.read().await;
         for buf in bufs {
             let len = min(buf.len(), ilock.content.len() - olock.pos);
@@ -118,7 +196,7 @@ impl WasiFile for Open<Vec<u8>, Data> {
         bufs: &mut [IoSliceMut<'a>],
         offset: u64,
     ) -> Result<u64, Error> {
-        if !self.data.read {
+        if !self.read {
             return Err(Error::io()); // FIXME: errorno
         }
 
@@ -137,13 +215,13 @@ impl WasiFile for Open<Vec<u8>, Data> {
     }
 
     async fn write_vectored<'a>(&mut self, bufs: &[IoSlice<'a>]) -> Result<u64, Error> {
-        if !self.data.write {
+        if !self.write {
             return Err(Error::io()); // FIXME: errorno
         }
 
         let mut total = 0;
 
-        let mut olock = self.data.state.write().await;
+        let mut olock = self.state.write().await;
         let mut ilock = self.link.inode.data.write().await;
         for buf in bufs {
             let pos = match olock.flags.contains(FdFlags::APPEND) {
@@ -174,7 +252,7 @@ impl WasiFile for Open<Vec<u8>, Data> {
         bufs: &[IoSlice<'a>],
         offset: u64,
     ) -> Result<u64, Error> {
-        if !self.data.write {
+        if !self.write {
             return Err(Error::io()); // FIXME: errorno
         }
 
@@ -196,7 +274,7 @@ impl WasiFile for Open<Vec<u8>, Data> {
     }
 
     async fn seek(&mut self, pos: SeekFrom) -> Result<u64, Error> {
-        let mut olock = self.data.state.write().await;
+        let mut olock = self.state.write().await;
         let ilock = self.link.inode.data.read().await;
 
         let cur = match pos {
@@ -219,13 +297,13 @@ impl WasiFile for Open<Vec<u8>, Data> {
     }
 
     async fn peek(&mut self, buf: &mut [u8]) -> Result<u64, Error> {
-        if !self.data.read {
+        if !self.read {
             return Err(Error::io()); // FIXME: errorno
         }
 
         let mut total = 0;
 
-        let olock = self.data.state.read().await;
+        let olock = self.state.read().await;
         let ilock = self.link.inode.data.read().await;
         let len = min(buf.len(), ilock.content.len() - olock.pos);
         buf[..len].copy_from_slice(&ilock.content[olock.pos..][..len]);
@@ -235,11 +313,11 @@ impl WasiFile for Open<Vec<u8>, Data> {
     }
 
     async fn num_ready_bytes(&self) -> Result<u64, Error> {
-        if !self.data.read {
+        if !self.read {
             return Err(Error::io()); // FIXME: errorno
         }
 
-        let olock = self.data.state.read().await;
+        let olock = self.state.read().await;
         let ilock = self.link.inode.data.read().await;
         let len = min(ilock.content.len(), olock.pos);
         let len = ilock.content.len() - len;

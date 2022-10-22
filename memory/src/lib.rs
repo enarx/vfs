@@ -1,15 +1,60 @@
-use std::sync::Arc;
+use std::sync::Weak;
 use std::time::SystemTime;
+use std::{any::Any, sync::Arc};
 
 use tokio::sync::RwLock;
-use wasi_common::{Error, SystemTimeSpec};
+use wasi_common::dir::{ReaddirCursor, ReaddirEntity};
+use wasi_common::file::FdFlags;
+use wasi_common::{Error, SystemTimeSpec, WasiDir, WasiFile};
 use wasmtime_vfs_ledger::InodeId;
+
+#[async_trait::async_trait]
+pub trait Node: 'static + Send + Sync {
+    fn parent(&self) -> Option<Arc<dyn Node>>;
+    fn as_any(&self) -> &dyn Any;
+    fn id(&self) -> Arc<InodeId>;
+
+    fn entity(&self, name: String, next: ReaddirCursor) -> ReaddirEntity;
+
+    async fn open_dir(self: Arc<Self>) -> Result<Box<dyn WasiDir>, Error>;
+
+    async fn open_file(
+        self: Arc<Self>,
+        dir: bool,
+        read: bool,
+        write: bool,
+        flags: FdFlags,
+    ) -> Result<Box<dyn WasiFile>, Error>;
+
+    fn root(self: &Arc<Self>) -> Arc<dyn Node>
+    where
+        Self: Sized,
+    {
+        let mut root: Arc<dyn Node> = self.clone();
+
+        while let Some(parent) = root.parent() {
+            root = parent;
+        }
+
+        root
+    }
+}
 
 pub struct Data<T> {
     pub create: SystemTime,
     pub access: SystemTime,
     pub modify: SystemTime,
     pub content: T,
+}
+
+pub struct Inode<T> {
+    pub data: RwLock<Data<T>>,
+    pub id: Arc<InodeId>,
+}
+
+pub struct Link<T> {
+    pub parent: Weak<dyn Node>,
+    pub inode: Arc<Inode<T>>,
 }
 
 impl<T: Default> Default for Data<T> {
@@ -22,6 +67,13 @@ impl<T: Default> Default for Data<T> {
             modify: now,
             content: T::default(),
         }
+    }
+}
+
+impl<T: Default> From<Arc<InodeId>> for Inode<T> {
+    fn from(id: Arc<InodeId>) -> Self {
+        let data = Data::default().into();
+        Self { data, id }
     }
 }
 
@@ -60,9 +112,4 @@ impl<T> Data<T> {
 
         Ok(())
     }
-}
-
-pub struct Inode<T> {
-    pub data: RwLock<Data<T>>,
-    pub id: Arc<InodeId>,
 }

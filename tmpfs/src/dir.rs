@@ -1,41 +1,114 @@
 use std::any::Any;
 use std::collections::BTreeMap;
 use std::io::{IoSlice, IoSliceMut, SeekFrom};
+use std::ops::{Deref, DerefMut};
 use std::path::{PathBuf, MAIN_SEPARATOR as SEP};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use wasi_common::dir::{ReaddirCursor, ReaddirEntity};
 use wasi_common::file::{Advice, FdFlags, FileType, Filestat, OFlags};
 use wasi_common::{Error, ErrorExt, SystemTimeSpec, WasiDir, WasiFile};
+use wasmtime_vfs_ledger::{InodeId, Ledger};
+use wasmtime_vfs_memory::{Inode, Link, Node};
 
-use crate::inode::{Data, Inode};
-use crate::link::Link;
-use crate::node::Node;
+use super::{File, Open, State};
 
-impl Link<BTreeMap<String, Arc<dyn Node>>> {
-    pub fn mkdir(self: &Arc<Self>) -> Arc<dyn Node> {
-        Arc::new(Link {
-            parent: Arc::downgrade(&self.here()),
-            inode: Arc::new(Inode {
-                id: self.inode.id.device().create_inode(),
-                data: Data::<BTreeMap<_, _>>::default().into(),
-            }),
-        })
+pub struct Directory(Link<BTreeMap<String, Arc<dyn Node>>>);
+
+impl Deref for Directory {
+    type Target = Link<BTreeMap<String, Arc<dyn Node>>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Directory {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Directory {
+    fn here(self: &Arc<Self>) -> Arc<dyn Node> {
+        self.clone()
     }
 
-    pub fn mkfile(self: &Arc<Self>) -> Arc<dyn Node> {
-        Arc::new(Link {
-            parent: Arc::downgrade(&self.here()),
-            inode: Arc::new(Inode {
-                id: self.inode.id.device().create_inode(),
-                data: Data::<Vec<u8>>::default().into(),
-            }),
-        })
+    fn prev(self: &Arc<Self>) -> Arc<dyn Node> {
+        match self.parent.upgrade() {
+            Some(parent) => parent,
+            None => self.here(),
+        }
+    }
+
+    pub(crate) fn root(ledger: Arc<Ledger>) -> Arc<Self> {
+        Arc::new(Self(Link {
+            parent: Weak::<Self>::new(),
+            inode: Arc::new(Inode::from(ledger.create_device().create_inode())),
+        }))
+    }
+
+    pub(crate) fn new(parent: Arc<dyn Node>) -> Arc<Self> {
+        let id = parent.id().device().create_inode();
+        Arc::new(Self(Link {
+            parent: Arc::downgrade(&parent),
+            inode: Inode::from(id).into(),
+        }))
     }
 }
 
 #[async_trait::async_trait]
-impl WasiDir for super::Open<BTreeMap<String, Arc<dyn Node>>, ()> {
+impl Node for Directory {
+    fn parent(&self) -> Option<Arc<dyn Node>> {
+        self.parent.upgrade()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn id(&self) -> Arc<InodeId> {
+        self.inode.id.clone()
+    }
+
+    fn entity(&self, name: String, next: ReaddirCursor) -> ReaddirEntity {
+        ReaddirEntity {
+            name,
+            filetype: FileType::Directory,
+            inode: **self.inode.id,
+            next,
+        }
+    }
+
+    async fn open_dir(self: Arc<Self>) -> Result<Box<dyn WasiDir>, Error> {
+        Ok(Box::new(Open {
+            _root: self.root(),
+            link: self,
+            state: State::default().into(),
+            write: false,
+            read: false,
+        }))
+    }
+
+    async fn open_file(
+        self: Arc<Self>,
+        _dir: bool,
+        read: bool,
+        write: bool,
+        flags: FdFlags,
+    ) -> Result<Box<dyn WasiFile>, Error> {
+        Ok(Box::new(Open {
+            _root: self.root(),
+            link: self,
+            state: State::from(flags).into(),
+            write,
+            read,
+        }))
+    }
+}
+
+#[async_trait::async_trait]
+impl WasiDir for Open<Directory> {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -102,9 +175,9 @@ impl WasiDir for super::Open<BTreeMap<String, Arc<dyn Node>>, ()> {
 
                     // If the file doesn't exist, create it.
                     (None, true) => {
-                        let child = match oflags.contains(OFlags::DIRECTORY) {
-                            true => self.link.mkdir(),
-                            false => self.link.mkfile(),
+                        let child: Arc<dyn Node> = match oflags.contains(OFlags::DIRECTORY) {
+                            true => Directory::new(self.link.clone()),
+                            false => File::new(self.link.clone()),
                         };
 
                         ilock.content.insert(name.into(), child.clone());
@@ -157,7 +230,7 @@ impl WasiDir for super::Open<BTreeMap<String, Arc<dyn Node>>, ()> {
                 match ilock.content.contains_key(name) {
                     true => Err(Error::exist()),
                     false => {
-                        let child = self.link.mkdir();
+                        let child = Directory::new(self.link.clone());
                         ilock.content.insert(name.into(), child);
                         Ok(())
                     }
@@ -374,7 +447,7 @@ impl WasiDir for super::Open<BTreeMap<String, Arc<dyn Node>>, ()> {
 }
 
 #[async_trait::async_trait]
-impl WasiFile for super::Open<BTreeMap<String, Arc<dyn Node>>, super::Data> {
+impl WasiFile for Open<Directory> {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -431,7 +504,7 @@ impl WasiFile for super::Open<BTreeMap<String, Arc<dyn Node>>, super::Data> {
         atime: Option<SystemTimeSpec>,
         mtime: Option<SystemTimeSpec>,
     ) -> Result<(), Error> {
-        if !self.data.write {
+        if !self.write {
             return Err(Error::io()); // FIXME: errorno
         }
 

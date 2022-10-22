@@ -1,17 +1,12 @@
 [package]
-name = "wasmtime-vfs-tmpfs"
+name = "wasmtime-vfs-memory"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+tokio = { version = "1.21.2", features = [ "rt-multi-thread" ] }
 wasmtime-vfs-ledger = { path = "../ledger" }
-wasmtime-vfs-memory = { path = "../memory" }
-tokio = { version = "1.21.2", default-features = false, features = ["sync", "macros", "rt"] }
-async-recursion = "1.0.0"
 async-trait = "0.1.51"
 wasi-common = "2.0.0"
-rustix = "0.35.11"
-anyhow = "1.0.51"
-
