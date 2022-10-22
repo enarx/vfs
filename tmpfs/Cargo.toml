@@ -10,7 +10,7 @@ wasmtime-vfs-ledger = { path = "../ledger" }
 tokio = { version = "1.21.2", default-features = false, features = ["sync", "macros", "rt"] }
 async-recursion = "1.0.0"
 async-trait = "0.1.51"
-wasi-common = "1.0.1"
+wasi-common = "2.0.0"
 rustix = "0.35.11"
 anyhow = "1.0.51"
 
