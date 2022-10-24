@@ -30,14 +30,10 @@ impl DerefMut for Directory {
 }
 
 impl Directory {
-    fn here(self: &Arc<Self>) -> Arc<dyn Node> {
-        self.clone()
-    }
-
     fn prev(self: &Arc<Self>) -> Arc<dyn Node> {
         match self.parent.upgrade() {
             Some(parent) => parent,
-            None => self.here(),
+            None => self.clone(),
         }
     }
 
@@ -157,7 +153,7 @@ impl WasiDir for Open<Directory> {
         match path {
             "." if oflags.contains(OFlags::EXCLUSIVE) => Err(Error::exist()),
             "." if oflags.contains(OFlags::TRUNCATE) => Err(Error::io()), // FIXME
-            "." | "" => self.link.here().open_file(odir, read, write, flags).await,
+            "." | "" => self.link.clone().open_file(odir, read, write, flags).await,
 
             ".." if oflags.contains(OFlags::EXCLUSIVE) => Err(Error::exist()),
             ".." if oflags.contains(OFlags::TRUNCATE) => Err(Error::io()), // FIXME
@@ -206,7 +202,7 @@ impl WasiDir for Open<Directory> {
 
         match path {
             "" => Err(Error::invalid_argument()),
-            "." => self.link.here().open_dir().await,
+            "." => self.link.clone().open_dir().await,
             ".." => self.link.prev().open_dir().await,
 
             name => {
@@ -252,7 +248,7 @@ impl WasiDir for Open<Directory> {
 
         // Add the single dot entries.
         let mut entries = vec![
-            Ok(self.link.here().entity(".".into(), 1.into())),
+            Ok(self.link.clone().entity(".".into(), 1.into())),
             Ok(self.link.prev().entity("..".into(), 2.into())),
         ];
 
