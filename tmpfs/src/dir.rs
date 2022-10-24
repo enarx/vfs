@@ -38,9 +38,10 @@ impl Directory {
     }
 
     pub(crate) fn root(ledger: Arc<Ledger>) -> Arc<Self> {
+        let id = ledger.create_device().create_inode();
         Arc::new(Self(Link {
             parent: Weak::<Self>::new(),
-            inode: Arc::new(Inode::from(ledger.create_device().create_inode())),
+            inode: Inode::from(id).into(),
         }))
     }
 
