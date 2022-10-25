@@ -56,25 +56,20 @@ impl Directory {
 
 #[async_trait::async_trait]
 impl Node for Directory {
+    fn to_any(self: Arc<Self>) -> Arc<dyn Any + Send + Sync> {
+        self
+    }
+
     fn parent(&self) -> Option<Arc<dyn Node>> {
         self.parent.upgrade()
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
+    fn filetype(&self) -> FileType {
+        FileType::Directory
     }
 
     fn id(&self) -> Arc<InodeId> {
         self.inode.id.clone()
-    }
-
-    fn entity(&self, name: String, next: ReaddirCursor) -> ReaddirEntity {
-        ReaddirEntity {
-            name,
-            filetype: FileType::Directory,
-            inode: **self.inode.id,
-            next,
-        }
     }
 
     async fn open_dir(self: Arc<Self>) -> Result<Box<dyn WasiDir>, Error> {
@@ -249,14 +244,29 @@ impl WasiDir for Open<Directory> {
 
         // Add the single dot entries.
         let mut entries = vec![
-            Ok(self.link.clone().entity(".".into(), 1.into())),
-            Ok(self.link.prev().entity("..".into(), 2.into())),
+            Ok(ReaddirEntity {
+                name: ".".into(),
+                next: 1.into(),
+                inode: **self.link.id(),
+                filetype: self.link.filetype(),
+            }),
+            Ok(ReaddirEntity {
+                name: "..".into(),
+                next: 2.into(),
+                inode: **self.link.prev().id(),
+                filetype: self.link.prev().filetype(),
+            }),
         ];
 
         // Add all of the child entries.
         for (k, v) in ilock.content.iter() {
             let next = entries.len() as u64 + 1;
-            entries.push(Ok(v.entity(k.clone(), next.into())));
+            entries.push(Ok(ReaddirEntity {
+                name: k.into(),
+                next: next.into(),
+                inode: **v.id(),
+                filetype: v.filetype(),
+            }));
         }
 
         Ok(Box::new(entries.into_iter().skip(cursor)))
@@ -277,7 +287,7 @@ impl WasiDir for Open<Directory> {
     // However, we cannot do this check across filesystem boundaries without
     // a race condition. Even if we could, we probably shouldn't because the
     // behavior would be odd. Therefore, we only remove child directories if
-    // the child is also a `tmpfs` AND has the same device id.
+    // the child is also a `Directory` AND has the same device id.
     async fn remove_dir(&self, path: &str) -> Result<(), Error> {
         if let Some((lhs, rhs)) = path.split_once(SEP) {
             let child = self.open_dir(true, lhs).await?;
@@ -290,21 +300,20 @@ impl WasiDir for Open<Directory> {
             name => {
                 let mut plock = self.link.inode.data.write().await;
 
-                {
-                    let cnode = plock.content.get(name).ok_or_else(Error::not_found)?;
+                let cnode = plock.content.get(name).ok_or_else(Error::not_found)?;
+                if self.link.id().device() != cnode.id().device() {
+                    return Err(Error::io()); // FIXME: EXDEV?
+                }
 
-                    let clink = cnode
-                        .as_any()
-                        .downcast_ref::<Link<Vec<u8>>>()
-                        .ok_or_else(Error::io)?; // FIXME: ENOTFILE?
-                    if self.link.inode.id.device() != clink.inode.id.device() {
-                        return Err(Error::io()); // FIXME: EXDEV?
-                    }
+                let clink = cnode
+                    .clone()
+                    .to_any()
+                    .downcast::<Directory>()
+                    .map_err(|_| Error::not_dir())?;
 
-                    let clock = clink.inode.data.read().await;
-                    if clock.content.is_empty() {
-                        return Err(Error::io()); // FIXME: ENOTEMPTY
-                    }
+                let clock = clink.inode.data.read().await;
+                if clock.content.is_empty() {
+                    return Err(Error::io()); // FIXME: ENOTEMPTY
                 }
 
                 plock.content.remove(name);
@@ -327,11 +336,11 @@ impl WasiDir for Open<Directory> {
                 let mut plock = self.link.inode.data.write().await;
                 let cnode = plock.content.get(name).ok_or_else(Error::not_found)?;
 
-                let clink = cnode
-                    .as_any()
-                    .downcast_ref::<Link<Vec<u8>>>()
-                    .ok_or_else(Error::io)?; // FIXME: ENOTFILE?
-                if self.link.inode.id.device() != clink.inode.id.device() {
+                if cnode.filetype() == FileType::Directory {
+                    return Err(Error::io()); // FIXME: ENOTFILE?
+                }
+
+                if self.link.id().device() != cnode.id().device() {
                     return Err(Error::io()); // FIXME: EXDEV?
                 }
 

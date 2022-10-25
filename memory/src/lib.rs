@@ -3,18 +3,16 @@ use std::time::SystemTime;
 use std::{any::Any, sync::Arc};
 
 use tokio::sync::RwLock;
-use wasi_common::dir::{ReaddirCursor, ReaddirEntity};
-use wasi_common::file::FdFlags;
+use wasi_common::file::{FdFlags, FileType};
 use wasi_common::{Error, SystemTimeSpec, WasiDir, WasiFile};
 use wasmtime_vfs_ledger::InodeId;
 
 #[async_trait::async_trait]
-pub trait Node: 'static + Send + Sync {
+pub trait Node: 'static + Any + Send + Sync {
+    fn to_any(self: Arc<Self>) -> Arc<dyn Any + Send + Sync>;
     fn parent(&self) -> Option<Arc<dyn Node>>;
-    fn as_any(&self) -> &dyn Any;
+    fn filetype(&self) -> FileType;
     fn id(&self) -> Arc<InodeId>;
-
-    fn entity(&self, name: String, next: ReaddirCursor) -> ReaddirEntity;
 
     async fn open_dir(self: Arc<Self>) -> Result<Box<dyn WasiDir>, Error>;
 

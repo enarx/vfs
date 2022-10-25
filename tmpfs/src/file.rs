@@ -4,7 +4,6 @@ use std::io::{IoSlice, IoSliceMut, SeekFrom};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-use wasi_common::dir::{ReaddirCursor, ReaddirEntity};
 use wasi_common::file::{Advice, FdFlags, FileType, Filestat};
 use wasi_common::{Error, ErrorExt, ErrorKind, SystemTimeSpec, WasiDir, WasiFile};
 use wasmtime_vfs_ledger::InodeId;
@@ -30,25 +29,20 @@ impl DerefMut for File {
 
 #[async_trait::async_trait]
 impl Node for File {
+    fn to_any(self: Arc<Self>) -> Arc<dyn Any + Send + Sync> {
+        self
+    }
+
     fn parent(&self) -> Option<Arc<dyn Node>> {
         self.parent.upgrade()
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
+    fn filetype(&self) -> FileType {
+        FileType::RegularFile
     }
 
     fn id(&self) -> Arc<InodeId> {
         self.inode.id.clone()
-    }
-
-    fn entity(&self, name: String, next: ReaddirCursor) -> ReaddirEntity {
-        ReaddirEntity {
-            name,
-            filetype: FileType::RegularFile,
-            inode: **self.inode.id,
-            next,
-        }
     }
 
     async fn open_dir(self: Arc<Self>) -> Result<Box<dyn WasiDir>, Error> {
