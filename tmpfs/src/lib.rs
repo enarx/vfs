@@ -4,39 +4,6 @@ mod file;
 pub use dir::Directory;
 pub use file::File;
 
-use std::sync::Arc;
-
-use tokio::sync::RwLock;
-use wasi_common::file::FdFlags;
-use wasmtime_vfs_memory::Node;
-
-struct Open<T> {
-    _root: Arc<dyn Node>,
-    link: Arc<T>,
-
-    state: RwLock<State>,
-    write: bool,
-    read: bool,
-}
-
-struct State {
-    flags: FdFlags,
-    pos: usize,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        let flags = FdFlags::empty();
-        Self { flags, pos: 0 }
-    }
-}
-
-impl From<FdFlags> for State {
-    fn from(flags: FdFlags) -> Self {
-        Self { flags, pos: 0 }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use std::io::IoSliceMut;

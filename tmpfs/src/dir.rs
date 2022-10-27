@@ -9,9 +9,9 @@ use wasi_common::dir::{ReaddirCursor, ReaddirEntity};
 use wasi_common::file::{Advice, FdFlags, FileType, Filestat, OFlags};
 use wasi_common::{Error, ErrorExt, SystemTimeSpec, WasiDir, WasiFile};
 use wasmtime_vfs_ledger::{InodeId, Ledger};
-use wasmtime_vfs_memory::{Inode, Link, Node};
+use wasmtime_vfs_memory::{Inode, Link, Node, Open, State};
 
-use super::{File, Open, State};
+use super::File;
 
 pub struct Directory(Link<BTreeMap<String, Arc<dyn Node>>>);
 
@@ -110,13 +110,13 @@ impl Node for Directory {
     }
 
     async fn open_dir(self: Arc<Self>) -> Result<Box<dyn WasiDir>, Error> {
-        Ok(Box::new(Open {
-            _root: self.root(),
+        Ok(Box::new(OpenDir(Open {
+            root: self.root(),
             link: self,
             state: State::default().into(),
             write: false,
             read: false,
-        }))
+        })))
     }
 
     async fn open_file(
@@ -126,18 +126,28 @@ impl Node for Directory {
         write: bool,
         flags: FdFlags,
     ) -> Result<Box<dyn WasiFile>, Error> {
-        Ok(Box::new(Open {
-            _root: self.root(),
+        Ok(Box::new(OpenDir(Open {
+            root: self.root(),
             link: self,
             state: State::from(flags).into(),
             write,
             read,
-        }))
+        })))
+    }
+}
+
+struct OpenDir(Open<Directory>);
+
+impl Deref for OpenDir {
+    type Target = Open<Directory>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
 #[async_trait::async_trait]
-impl WasiDir for Open<Directory> {
+impl WasiDir for OpenDir {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -490,7 +500,7 @@ impl WasiDir for Open<Directory> {
 }
 
 #[async_trait::async_trait]
-impl WasiFile for Open<Directory> {
+impl WasiFile for OpenDir {
     fn as_any(&self) -> &dyn Any {
         self
     }

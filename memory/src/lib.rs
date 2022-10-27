@@ -55,6 +55,33 @@ pub struct Link<T> {
     pub inode: Arc<Inode<T>>,
 }
 
+pub struct Open<T> {
+    pub root: Arc<dyn Node>,
+    pub link: Arc<T>,
+
+    pub state: RwLock<State>,
+    pub write: bool,
+    pub read: bool,
+}
+
+pub struct State {
+    pub flags: FdFlags,
+    pub pos: usize,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        let flags = FdFlags::empty();
+        Self { flags, pos: 0 }
+    }
+}
+
+impl From<FdFlags> for State {
+    fn from(flags: FdFlags) -> Self {
+        Self { flags, pos: 0 }
+    }
+}
+
 impl<T> From<T> for Data<T> {
     fn from(content: T) -> Self {
         let now = SystemTime::now();

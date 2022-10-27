@@ -7,9 +7,7 @@ use std::sync::Arc;
 use wasi_common::file::{Advice, FdFlags, FileType, Filestat};
 use wasi_common::{Error, ErrorExt, ErrorKind, SystemTimeSpec, WasiDir, WasiFile};
 use wasmtime_vfs_ledger::InodeId;
-use wasmtime_vfs_memory::{Data, Inode, Link, Node};
-
-use super::{Open, State};
+use wasmtime_vfs_memory::{Data, Inode, Link, Node, Open, State};
 
 pub struct File(Link<Vec<u8>>);
 
@@ -60,13 +58,13 @@ impl Node for File {
             return Err(Error::not_dir());
         }
 
-        Ok(Box::new(Open {
-            _root: self.root(),
+        Ok(Box::new(OpenFile(Open {
+            root: self.root(),
             link: self,
             state: State::from(flags).into(),
             write,
             read,
-        }))
+        })))
     }
 }
 
@@ -90,8 +88,18 @@ impl File {
     }
 }
 
+struct OpenFile(Open<File>);
+
+impl Deref for OpenFile {
+    type Target = Open<File>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[async_trait::async_trait]
-impl WasiFile for Open<File> {
+impl WasiFile for OpenFile {
     fn as_any(&self) -> &dyn Any {
         self
     }
