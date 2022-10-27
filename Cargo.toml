@@ -15,11 +15,12 @@ wasi-common = "2.0.0"
 wasmtime = "2.0.0"
 wasmtime-vfs-memory = { path = "./memory" }
 wasmtime-vfs-ledger = { path = "./ledger" }
-wasmtime-vfs-tmpfs = { path = "./tmpfs" }
+wasmtime-vfs-file = { path = "./file" }
+wasmtime-vfs-dir = { path = "./dir" }
 wasmtime-wasi = "2.0.0"
 
 [features]
 interactive = []
 
 [workspace]
-members = ["tmpfs", "ledger", "memory"]
+members = ["ledger", "memory", "file", "dir"]

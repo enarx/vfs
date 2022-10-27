@@ -1,0 +1,10 @@
+[package]
+name = "wasmtime-vfs-file"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wasmtime-vfs-ledger = { path = "../ledger" }
+wasmtime-vfs-memory = { path = "../memory" }
+async-trait = "0.1.51"
+wasi-common = "2.0.0"

@@ -3,9 +3,10 @@ mod util;
 use anyhow::Context;
 use tempfile::tempdir;
 use tokio::test;
+use wasmtime_vfs_dir::Directory;
+use wasmtime_vfs_file::File;
 use wasmtime_vfs_ledger::Ledger;
 use wasmtime_vfs_memory::Node;
-use wasmtime_vfs_tmpfs::{Directory, File};
 
 #[test]
 #[cfg_attr(feature = "interactive", serial_test::serial)]
