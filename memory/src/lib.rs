@@ -55,16 +55,22 @@ pub struct Link<T> {
     pub inode: Arc<Inode<T>>,
 }
 
-impl<T: Default> Default for Data<T> {
-    fn default() -> Self {
+impl<T> From<T> for Data<T> {
+    fn from(content: T) -> Self {
         let now = SystemTime::now();
 
         Self {
             create: now,
             access: now,
             modify: now,
-            content: T::default(),
+            content,
         }
+    }
+}
+
+impl<T: Default> Default for Data<T> {
+    fn default() -> Self {
+        T::default().into()
     }
 }
 
