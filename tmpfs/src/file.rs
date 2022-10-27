@@ -7,7 +7,7 @@ use std::sync::Arc;
 use wasi_common::file::{Advice, FdFlags, FileType, Filestat};
 use wasi_common::{Error, ErrorExt, ErrorKind, SystemTimeSpec, WasiDir, WasiFile};
 use wasmtime_vfs_ledger::InodeId;
-use wasmtime_vfs_memory::{Inode, Link, Node};
+use wasmtime_vfs_memory::{Data, Inode, Link, Node};
 
 use super::{Open, State};
 
@@ -71,11 +71,21 @@ impl Node for File {
 }
 
 impl File {
-    pub(crate) fn new(parent: Arc<dyn Node>) -> Arc<Self> {
+    pub fn new(parent: Arc<dyn Node>) -> Arc<Self> {
+        Self::with_data(parent, [])
+    }
+
+    pub fn with_data(parent: Arc<dyn Node>, data: impl Into<Vec<u8>>) -> Arc<Self> {
         let id = parent.id().device().create_inode();
+
+        let inode = Inode {
+            data: Data::from(data.into()).into(),
+            id,
+        };
+
         Arc::new(Self(Link {
             parent: Arc::downgrade(&parent),
-            inode: Inode::from(id).into(),
+            inode: inode.into(),
         }))
     }
 }

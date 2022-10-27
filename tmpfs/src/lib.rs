@@ -1,8 +1,6 @@
-mod builder;
 mod dir;
 mod file;
 
-pub use builder::Builder;
 pub use dir::Directory;
 pub use file::File;
 
@@ -46,29 +44,32 @@ mod test {
     use wasi_common::file::{FdFlags, FileType, OFlags};
     use wasi_common::Error;
     use wasmtime_vfs_ledger::Ledger;
+    use wasmtime_vfs_memory::Node;
 
-    use super::builder::Builder;
+    use super::{Directory, File};
 
     #[tokio::test]
     async fn test() -> Result<(), Error> {
-        let treefs = Builder::from(Ledger::new())
-            .add("foo", None)
+        const FILES: &[(&str, Option<&[u8]>)] = &[
+            ("foo", None),
+            ("foo/bar", Some(b"abc")),
+            ("foo/baz", Some(b"abc")),
+            ("foo/bat", None),
+            ("foo/bat/qux", Some(b"abc")),
+            ("ack", None),
+            ("ack/act", Some(b"abc")),
+            ("zip", Some(b"abc")),
+        ];
+
+        let dir = Directory::root(Ledger::new());
+        for (path, data) in FILES {
+            dir.attach(path, |p| match data {
+                Some(data) => Ok(File::with_data(p, *data)),
+                None => Ok(Directory::new(p)),
+            })
             .await?
-            .add("foo/bar", b"abc".to_vec())
-            .await?
-            .add("foo/baz", b"abc".to_vec())
-            .await?
-            .add("foo/bat", None)
-            .await?
-            .add("foo/bat/qux", b"abc".to_vec())
-            .await?
-            .add("ack", None)
-            .await?
-            .add("ack/act", b"abc".to_vec())
-            .await?
-            .add("zip", b"abc".to_vec())
-            .await?
-            .build();
+        }
+        let treefs = dir.open_dir().await?;
 
         let top: Vec<Result<_, _>> = treefs.readdir(0.into()).await.unwrap().collect();
 

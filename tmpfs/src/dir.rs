@@ -37,7 +37,7 @@ impl Directory {
         }
     }
 
-    pub(crate) fn root(ledger: Arc<Ledger>) -> Arc<Self> {
+    pub fn root(ledger: Arc<Ledger>) -> Arc<Self> {
         let id = ledger.create_device().create_inode();
         Arc::new(Self(Link {
             parent: Weak::<Self>::new(),
@@ -45,12 +45,49 @@ impl Directory {
         }))
     }
 
-    pub(crate) fn new(parent: Arc<dyn Node>) -> Arc<Self> {
+    pub fn new(parent: Arc<dyn Node>) -> Arc<Self> {
         let id = parent.id().device().create_inode();
         Arc::new(Self(Link {
             parent: Arc::downgrade(&parent),
             inode: Inode::from(id).into(),
         }))
+    }
+
+    pub async fn attach<F>(self: &Arc<Self>, mut path: &str, func: F) -> Result<(), Error>
+    where
+        F: Fn(Arc<Self>) -> Result<Arc<dyn Node>, Error>,
+    {
+        let mut this = self.clone();
+
+        while let Some((lhs, rhs)) = path.trim_end_matches('/').split_once(SEP) {
+            let next: Arc<dyn Node> = match lhs {
+                "" | "." => self.clone(),
+                ".." => self.prev(),
+                lhs => self
+                    .inode
+                    .data
+                    .read()
+                    .await
+                    .content
+                    .get(lhs)
+                    .ok_or_else(Error::not_found)?
+                    .clone(),
+            };
+
+            this = next.to_any().downcast().map_err(|_| Error::not_dir())?;
+            path = rhs;
+        }
+
+        let mut ilock = this.inode.data.write().await;
+
+        match path {
+            "" | "." | ".." => Err(Error::invalid_argument()),
+            path if ilock.content.contains_key(path) => Err(Error::exist()),
+            path => {
+                ilock.content.insert(path.to_owned(), func(this.clone())?);
+                Ok(())
+            }
+        }
     }
 }
 

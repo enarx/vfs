@@ -13,6 +13,7 @@ tokio = { version = "1.21.2", features = [ "rt-multi-thread", "macros" ] }
 wash = { version = "0.1.0", git = "https://github.com/rvolosatovs/wash", artifact = "bin", target = "wasm32-wasi", default-features = false }
 wasi-common = "2.0.0"
 wasmtime = "2.0.0"
+wasmtime-vfs-memory = { path = "./memory" }
 wasmtime-vfs-ledger = { path = "./ledger" }
 wasmtime-vfs-tmpfs = { path = "./tmpfs" }
 wasmtime-wasi = "2.0.0"

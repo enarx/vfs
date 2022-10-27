@@ -1,11 +1,11 @@
 mod util;
 
-use std::fs::File;
-
 use anyhow::Context;
 use tempfile::tempdir;
 use tokio::test;
 use wasmtime_vfs_ledger::Ledger;
+use wasmtime_vfs_memory::Node;
+use wasmtime_vfs_tmpfs::{Directory, File};
 
 #[test]
 #[cfg_attr(feature = "interactive", serial_test::serial)]
@@ -21,7 +21,7 @@ test
 
     // Set up a temporary directory.
     let tmp = tempdir().context("failed to create a temporary directory")?;
-    let dir = File::open(&tmp)
+    let dir = std::fs::File::open(&tmp)
         .map(wasmtime_wasi::sync::Dir::from_std_file)
         .map(wasmtime_wasi::sync::dir::Dir::from_cap_std)
         .map(Box::new)
@@ -56,21 +56,26 @@ a.file b.dir
 "#;
 
     let tree = [
-        ("file", Some(b"file".to_vec())),
+        ("file", Some(b"file")),
         ("dir", None),
-        ("dir/a.file", Some(b"file".to_vec())),
+        ("dir/a.file", Some(b"file")),
         ("dir/b.dir", None),
     ];
 
     // Construct the tmpfs tree.
-    let mut builder = wasmtime_vfs_tmpfs::Builder::from(Ledger::new());
+    let root = Directory::root(Ledger::new());
     for (path, data) in tree {
-        builder = builder.add(path, data).await.unwrap();
+        root.attach(path, |p| match data {
+            Some(data) => Ok(File::with_data(p, *data)),
+            None => Ok(Directory::new(p)),
+        })
+        .await
+        .unwrap();
     }
-    let dir = builder.build();
+    let root = root.open_dir().await.unwrap();
 
     // Run the script and test the output.
-    let (out, err) = util::wash(dir, CMD)
+    let (out, err) = util::wash(root, CMD)
         .await
         .context("failed to execute `wash`")?;
     if cfg!(not(feature = "interactive")) {
