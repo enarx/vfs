@@ -36,6 +36,14 @@ impl Directory {
         }
     }
 
+    pub fn device(parent: Arc<dyn Node>) -> Arc<Self> {
+        let id = parent.id().device().ledger().create_device().create_inode();
+        Arc::new(Self(Link {
+            parent: Arc::downgrade(&parent),
+            inode: Inode::from(id).into(),
+        }))
+    }
+
     pub fn root(ledger: Arc<Ledger>) -> Arc<Self> {
         let id = ledger.create_device().create_inode();
         Arc::new(Self(Link {
