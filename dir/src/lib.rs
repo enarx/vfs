@@ -52,38 +52,43 @@ impl Directory {
         }))
     }
 
-    pub async fn attach<F>(self: &Arc<Self>, mut path: &str, func: F) -> Result<(), Error>
-    where
-        F: Fn(Arc<Self>) -> Result<Arc<dyn Node>, Error>,
-    {
-        let mut this = self.clone();
+    pub async fn get(self: &Arc<Self>, path: &str) -> Result<Arc<dyn Node>, Error> {
+        let mut this: Arc<dyn Node> = self.clone();
 
-        while let Some((lhs, rhs)) = path.trim_end_matches('/').split_once(SEP) {
-            let next: Arc<dyn Node> = match lhs {
-                "" | "." => self.clone(),
+        for seg in path.trim_end_matches(SEP).split(SEP) {
+            this = match seg {
+                "" | "." => continue,
                 ".." => self.prev(),
-                lhs => this
-                    .inode
-                    .data
-                    .read()
-                    .await
-                    .content
-                    .get(lhs)
-                    .ok_or_else(Error::not_found)?
-                    .clone(),
+                seg => {
+                    let any = this.to_any();
+                    let dir = any.downcast::<Directory>().map_err(|_| Error::not_dir())?;
+                    let ilock = dir.inode.data.read().await;
+                    ilock.content.get(seg).ok_or_else(Error::not_found)?.clone()
+                }
             };
-
-            this = next.to_any().downcast().map_err(|_| Error::not_dir())?;
-            path = rhs;
         }
+
+        Ok(this)
+    }
+
+    pub async fn attach(self: &Arc<Self>, path: &str, node: Arc<dyn Node>) -> Result<(), Error> {
+        let path = path.trim_end_matches(SEP);
+        let (this, name) = match path.rsplit_once(SEP) {
+            None => (self.clone(), path),
+            Some((lhs, rhs)) => {
+                let any = self.get(lhs).await?.to_any();
+                let dir = any.downcast::<Directory>().map_err(|_| Error::not_dir())?;
+                (dir, rhs)
+            }
+        };
 
         let mut ilock = this.inode.data.write().await;
 
-        match path {
+        match name {
             "" | "." | ".." => Err(Error::invalid_argument()),
-            path if ilock.content.contains_key(path) => Err(Error::exist()),
-            path => {
-                ilock.content.insert(path.to_owned(), func(this.clone())?);
+            name if ilock.content.contains_key(name) => Err(Error::exist()),
+            name => {
+                ilock.content.insert(name.to_owned(), node);
                 Ok(())
             }
         }
@@ -610,36 +615,37 @@ impl WasiFile for OpenDir {
 #[cfg(test)]
 mod test {
     use std::io::IoSliceMut;
+    use std::path::MAIN_SEPARATOR as SEP;
+    use std::sync::Arc;
 
     use wasi_common::file::{FdFlags, FileType, OFlags};
-    use wasi_common::Error;
     use wasmtime_vfs_ledger::Ledger;
     use wasmtime_vfs_memory::Node;
 
     use super::{Directory, File};
 
     #[tokio::test]
-    async fn test() -> Result<(), Error> {
+    async fn test() {
         const FILES: &[(&str, Option<&[u8]>)] = &[
-            ("foo", None),
-            ("foo/bar", Some(b"abc")),
-            ("foo/baz", Some(b"abc")),
-            ("foo/bat", None),
-            ("foo/bat/qux", Some(b"abc")),
-            ("ack", None),
-            ("ack/act", Some(b"abc")),
-            ("zip", Some(b"abc")),
+            ("/foo", None),
+            ("/foo/bar", Some(b"abc")),
+            ("/foo/baz", Some(b"abc")),
+            ("/foo/bat", None),
+            ("/foo/bat/qux", Some(b"abc")),
+            ("/ack", None),
+            ("/ack/act", Some(b"abc")),
+            ("/zip", Some(b"abc")),
         ];
 
         let dir = Directory::root(Ledger::new());
         for (path, data) in FILES {
-            eprintln!("creating {}", path);
-            dir.attach(path, |p| match data {
-                Some(data) => Ok(File::with_data(p, *data)),
-                None => Ok(Directory::new(p)),
-            })
-            .await
-            .unwrap()
+            let parent = dir.get(path.rsplit_once(SEP).unwrap().0).await.unwrap();
+            let child: Arc<dyn Node> = match data {
+                Some(data) => File::with_data(parent, *data),
+                None => Directory::new(parent),
+            };
+
+            dir.attach(path, child).await.unwrap()
         }
         let treefs = dir.open_dir().await.unwrap();
 
@@ -705,7 +711,5 @@ mod test {
         let len = qux.read_vectored(&mut bufs).await.unwrap();
         assert_eq!(len, 3);
         assert_eq!(&buf, b"abc");
-
-        Ok(())
     }
 }

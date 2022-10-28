@@ -1,5 +1,7 @@
 mod util;
 
+use std::sync::Arc;
+
 use anyhow::Context;
 use tempfile::tempdir;
 use tokio::test;
@@ -57,21 +59,22 @@ a.file b.dir
 "#;
 
     let tree = [
-        ("file", Some(b"file")),
-        ("dir", None),
-        ("dir/a.file", Some(b"file")),
-        ("dir/b.dir", None),
+        ("/file", Some(b"file")),
+        ("/dir", None),
+        ("/dir/a.file", Some(b"file")),
+        ("/dir/b.dir", None),
     ];
 
     // Construct the tmpfs tree.
     let root = Directory::root(Ledger::new());
     for (path, data) in tree {
-        root.attach(path, |p| match data {
-            Some(data) => Ok(File::with_data(p, *data)),
-            None => Ok(Directory::new(p)),
-        })
-        .await
-        .unwrap();
+        let parent = root.get(path.rsplit_once('/').unwrap().0).await.unwrap();
+        let child: Arc<dyn Node> = match data {
+            Some(data) => File::with_data(parent, *data),
+            None => Directory::new(parent),
+        };
+
+        root.attach(path, child).await.unwrap();
     }
     let root = root.open_dir().await.unwrap();
 
