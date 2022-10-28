@@ -1,0 +1,27 @@
+[package]
+name = "wasmtime-vfs-keyfs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wasmtime-vfs-memory = { path = "../memory" }
+wasmtime-vfs-ledger = { path = "../ledger" }
+wasmtime-vfs-file = { path = "../file" }
+wasmtime-vfs-dir = { path = "../dir" }
+
+async-trait = "0.1.51"
+wasi-common = "2.0.0"
+
+k256 = { version = "0.11.1", features = ["ecdsa"] }
+p256 = { version = "0.11.1", features = ["ecdsa"] }
+p384 = { version = "0.11.1", features = ["ecdsa"] }
+uuid = { version = "1.1.2", features = ["v4"] }
+signature = { version = "1.6.3" }
+digest = { version = "0.10.5" }
+ecdsa = { version = "0.14.8" }
+sha2 = { version = "0.10.6" }
+rand = { version = "0.8.5" }
+rsa = { version = "0.7.0-rc.1" }
+
+[dev-dependencies]
+tokio = { version = "1.21.2", default-features = false, features = ["macros", "rt"] }
