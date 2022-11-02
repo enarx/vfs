@@ -144,3 +144,72 @@ impl<T> Data<T> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::Data;
+
+    use std::thread;
+    use std::time::{Duration, SystemTime};
+
+    use wasi_common::SystemTimeSpec;
+
+    #[test]
+    fn data_set_times() {
+        let mut data: Data<()> = ().into();
+
+        let initial_create = data.create;
+        let initial_access = data.access;
+        let initial_modify = data.modify;
+
+        assert_eq!(data.create.elapsed().unwrap().as_secs(), 0);
+        assert_eq!(data.access.elapsed().unwrap().as_secs(), 0);
+        assert_eq!(data.modify.elapsed().unwrap().as_secs(), 0);
+
+        thread::sleep(Duration::from_millis(1));
+        let then = SystemTime::now();
+        thread::sleep(Duration::from_millis(1));
+
+        // Setting access time (absolute)
+        data.set_times(
+            SystemTimeSpec::Absolute(cap_std::time::SystemTime::from_std(then)),
+            None,
+        )
+        .unwrap();
+        assert_eq!(data.create, initial_create);
+        assert_eq!(data.access, then);
+        assert_eq!(data.modify, initial_modify);
+        data.access = initial_access;
+
+        // Setting access time (symbolic now)
+        data.set_times(SystemTimeSpec::SymbolicNow, None).unwrap();
+        assert_eq!(data.create, initial_create);
+        assert!(data.access > then);
+        assert_eq!(data.modify, initial_modify);
+        data.access = initial_access;
+
+        // Setting modify time (absolute)
+        data.set_times(
+            None,
+            SystemTimeSpec::Absolute(cap_std::time::SystemTime::from_std(then)),
+        )
+        .unwrap();
+        assert_eq!(data.create, initial_create);
+        assert_eq!(data.access, initial_access);
+        assert_eq!(data.modify, then);
+        data.modify = initial_modify;
+
+        // Setting modify time (symbolic now)
+        data.set_times(None, SystemTimeSpec::SymbolicNow).unwrap();
+        assert_eq!(data.create, initial_create);
+        assert_eq!(data.access, initial_access);
+        assert!(data.modify > then);
+        data.modify = initial_modify;
+
+        // Don't set anything (this should do nothing).
+        data.set_times(None, None).unwrap();
+        assert_eq!(data.create, initial_create);
+        assert_eq!(data.access, initial_access);
+        assert_eq!(data.modify, initial_modify);
+    }
+}
