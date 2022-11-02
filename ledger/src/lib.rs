@@ -15,9 +15,12 @@ impl Ledger {
     pub fn create_device(self: Arc<Self>) -> Arc<DeviceId> {
         Arc::new(DeviceId {
             id: {
-                let (free, next) = &mut *self.0.lock().unwrap();
-                let id = free.iter().cloned().chain(next).next().expect("out of ids");
-                free.remove(&id);
+                let (used, range) = &mut *self.0.lock().unwrap();
+                let id = range
+                    .into_iter()
+                    .find(|next| !used.contains(next))
+                    .expect("out of ids");
+                used.insert(id);
                 id
             },
             inodes: Mutex::new((BTreeSet::new(), 0..u64::MAX)),
@@ -35,7 +38,7 @@ pub struct DeviceId {
 
 impl Drop for DeviceId {
     fn drop(&mut self) {
-        self.devices.0.lock().unwrap().0.insert(self.id);
+        self.devices.0.lock().unwrap().0.remove(&self.id);
     }
 }
 
@@ -64,9 +67,12 @@ impl DeviceId {
     pub fn create_inode(self: Arc<Self>) -> Arc<InodeId> {
         Arc::new(InodeId {
             id: {
-                let (free, next) = &mut *self.inodes.lock().unwrap();
-                let id = free.iter().cloned().chain(next).next().expect("out of ids");
-                free.remove(&id);
+                let (used, range) = &mut *self.inodes.lock().unwrap();
+                let id = range
+                    .into_iter()
+                    .find(|next| !used.contains(next))
+                    .expect("out of ids");
+                used.insert(id);
                 id
             },
             device: self,
@@ -82,7 +88,7 @@ pub struct InodeId {
 
 impl Drop for InodeId {
     fn drop(&mut self) {
-        self.device.inodes.lock().unwrap().0.insert(self.id);
+        self.device.inodes.lock().unwrap().0.remove(&self.id);
     }
 }
 
