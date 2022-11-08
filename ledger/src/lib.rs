@@ -107,3 +107,63 @@ impl InodeId {
         self.device.clone()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::Ledger;
+
+    #[test]
+    fn reuse() {
+        // Test the first inode number.
+        let inode00 = Ledger::new().create_device().create_inode();
+        assert_eq!(**inode00.device(), 0);
+        assert_eq!(**inode00, 0);
+
+        // Test the second inode number.
+        let inode01 = inode00.device().create_inode();
+        assert_eq!(**inode01.device(), 0);
+        assert_eq!(**inode01, 1);
+
+        // Test the first inode on a new device.
+        let inode10 = inode00.device().ledger().create_device().create_inode();
+        assert_eq!(**inode10.device(), 1);
+        assert_eq!(**inode10, 0);
+
+        // Test the third inode number.
+        let inode02 = inode00.device().create_inode();
+        assert_eq!(**inode02.device(), 0);
+        assert_eq!(**inode02, 2);
+
+        // Test the second inode on a new device.
+        let inode11 = inode10.device().create_inode();
+        assert_eq!(**inode11.device(), 1);
+        assert_eq!(**inode11, 1);
+
+        // Test the third inode on a new device.
+        let inode12 = inode11.device().create_inode();
+        assert_eq!(**inode12.device(), 1);
+        assert_eq!(**inode12, 2);
+
+        drop(inode01);
+        drop(inode12);
+
+        // Test inode reuse.
+        let inode01 = inode00.device().create_inode();
+        assert_eq!(**inode01.device(), 0);
+        assert_eq!(**inode01, 1);
+
+        // Test inode reuse on a new device.
+        let inode12 = inode10.device().create_inode();
+        assert_eq!(**inode12.device(), 1);
+        assert_eq!(**inode12, 2);
+
+        drop(inode00);
+        drop(inode01);
+        drop(inode02);
+
+        // Test device reuse.
+        let inode00 = inode10.device().ledger().create_device().create_inode();
+        assert_eq!(**inode00.device(), 0);
+        assert_eq!(**inode00, 0);
+    }
+}
