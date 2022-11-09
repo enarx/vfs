@@ -2,25 +2,74 @@ use std::collections::BTreeSet;
 use std::ops::{Deref, Range};
 use std::sync::{Arc, Mutex};
 
+/// A potentially infinite stream of unique `u64` ids.
+///
+/// You can call `.next()` to allocate a new identifier. This will return
+/// `None` if the stream is exhausted. However, unused identifiers can be
+/// returned to the stream with `.free()` and will be reused.
+struct Reusable {
+    // A set of all free, discontiguous identifiers.
+    free: BTreeSet<u64>,
+
+    // A set of all free, contiguous identifiers.
+    next: Range<u64>,
+}
+
+impl Default for Reusable {
+    fn default() -> Self {
+        Reusable {
+            free: BTreeSet::new(),
+            next: 0..u64::MAX,
+        }
+    }
+}
+
+impl Iterator for Reusable {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Try to reuse an identifier from the discontiguous set.
+        // Fall back to allocating from the contiguous range.
+        self.free.pop_first().or_else(|| self.next.next())
+    }
+}
+
+impl Reusable {
+    fn free(&mut self, id: u64) {
+        // Detect double-free conditions.
+        debug_assert!(id < self.next.start);
+        debug_assert!(!self.free.contains(&id));
+
+        // Insert the freed id into the discontiguous set.
+        self.free.insert(id);
+
+        // Attempt to move the discontiguous set into the contiguous range.
+        while self.next.start > 0 {
+            let prev = self.next.start - 1;
+            if !self.free.remove(&prev) {
+                break;
+            }
+
+            self.next.start = prev;
+        }
+    }
+}
+
 /// A ledger of filesystem devices.
-pub struct Ledger(Mutex<(BTreeSet<u64>, Range<u64>)>);
+pub struct Ledger(Mutex<Reusable>);
 
 impl Ledger {
     /// Create a new ledger.
     pub fn new() -> Arc<Ledger> {
-        Arc::new(Self(Mutex::new((BTreeSet::new(), 0..u64::MAX))))
+        Arc::new(Ledger(Default::default()))
     }
 
     /// Allocate a new device.
     pub fn create_device(self: Arc<Self>) -> Arc<DeviceId> {
+        let id = self.0.lock().unwrap().next().expect("out of devices");
         Arc::new(DeviceId {
-            id: {
-                let (free, next) = &mut *self.0.lock().unwrap();
-                let id = free.iter().cloned().chain(next).next().expect("out of ids");
-                free.remove(&id);
-                id
-            },
-            inodes: Mutex::new((BTreeSet::new(), 0..u64::MAX)),
+            id,
+            inodes: Default::default(),
             devices: self,
         })
     }
@@ -29,13 +78,13 @@ impl Ledger {
 /// A filesystem device identifier.
 pub struct DeviceId {
     devices: Arc<Ledger>,
-    inodes: Mutex<(BTreeSet<u64>, Range<u64>)>,
+    inodes: Mutex<Reusable>,
     id: u64,
 }
 
 impl Drop for DeviceId {
     fn drop(&mut self) {
-        self.devices.0.lock().unwrap().0.insert(self.id);
+        self.devices.0.lock().unwrap().free(self.id);
     }
 }
 
@@ -62,15 +111,8 @@ impl DeviceId {
 
     /// Allocate a new inode.
     pub fn create_inode(self: Arc<Self>) -> Arc<InodeId> {
-        Arc::new(InodeId {
-            id: {
-                let (free, next) = &mut *self.inodes.lock().unwrap();
-                let id = free.iter().cloned().chain(next).next().expect("out of ids");
-                free.remove(&id);
-                id
-            },
-            device: self,
-        })
+        let id = self.inodes.lock().unwrap().next().expect("out of inodes");
+        Arc::new(InodeId { id, device: self })
     }
 }
 
@@ -82,7 +124,7 @@ pub struct InodeId {
 
 impl Drop for InodeId {
     fn drop(&mut self) {
-        self.device.inodes.lock().unwrap().0.insert(self.id);
+        self.device.inodes.lock().unwrap().free(self.id);
     }
 }
 
