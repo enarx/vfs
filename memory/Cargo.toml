@@ -10,3 +10,6 @@ tokio = { version = "1.21.2", default-features = false, features = ["sync"] }
 wasmtime-vfs-ledger = { path = "../ledger" }
 async-trait = "0.1.51"
 wasi-common = "2.0.0"
+
+[dev-dependencies]
+cap-std = { version = "0.26.1", default-features = false, features = [] }
