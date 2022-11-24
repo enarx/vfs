@@ -424,7 +424,7 @@ impl WasiDir for OpenDir {
         Ok(Filestat {
             device_id: **self.link.inode.id.device(),
             inode: **self.link.inode.id,
-            filetype: FileType::RegularFile,
+            filetype: FileType::Directory,
             nlink: Arc::strong_count(&self.link.inode) as u64 * 2,
             size: 0, // FIXME
             atim: Some(ilock.access),
