@@ -4,23 +4,49 @@ version = "0.1.0"
 edition = "2021"
 
 [dev-dependencies]
-anyhow = "1.0.65"
-async-trait = "0.1.51"
-rustix = "0.35.11"
-serial_test = "0.9.0"
-tempfile = "3.3.0"
-tokio = { version = "1.21.2", features = [ "rt-multi-thread", "macros" ] }
-wash = { version = "0.1.0", git = "https://github.com/rvolosatovs/wash", artifact = "bin", target = "wasm32-wasi", default-features = false }
-wasi-common = "2.0.0"
-wasmtime = "2.0.0"
-wasmtime-vfs-memory = { path = "./memory" }
-wasmtime-vfs-ledger = { path = "./ledger" }
-wasmtime-vfs-file = { path = "./file" }
-wasmtime-vfs-dir = { path = "./dir" }
-wasmtime-wasi = "2.0.0"
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+rustix = { workspace = true }
+serial_test = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = [ "rt-multi-thread", "macros" ] }
+wash = { workspace = true }
+wasi-common = { workspace = true }
+wasmtime = { workspace = true }
+wasmtime-vfs-memory = { workspace = true }
+wasmtime-vfs-ledger = { workspace = true }
+wasmtime-vfs-file = { workspace = true }
+wasmtime-vfs-dir = { workspace = true }
+wasmtime-wasi = { workspace = true }
 
 [features]
 interactive = []
 
 [workspace]
 members = ["ledger", "memory", "file", "dir", "keyfs"]
+
+[workspace.dependencies]
+anyhow = "1.0.65"
+async-trait = "0.1.51"
+digest = "0.10.5"
+ecdsa = "0.14.8"
+k256 = "0.11.1"
+p256 = "0.11.1"
+p384 = "0.11.1"
+rand = "0.8.5"
+rsa = "0.7.0-rc.1"
+rustix = "0.35.11"
+serial_test = "0.9.0"
+sha2 = "0.10.6"
+signature = "1.6.3"
+tempfile = "3.3.0"
+tokio = { version = "1.21.2", default-features = false }
+uuid = "1.1.2"
+wash = { version = "0.1.0", git = "https://github.com/rvolosatovs/wash", artifact = "bin", target = "wasm32-wasi", default-features = false }
+wasi-common = "2.0.0"
+wasmtime = "2.0.0"
+wasmtime-vfs-dir = { path = "./dir" }
+wasmtime-vfs-file = { path = "./file" }
+wasmtime-vfs-ledger = { path = "./ledger" }
+wasmtime-vfs-memory = { path = "./memory" }
+wasmtime-wasi = "2.0.0"

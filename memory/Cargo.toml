@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.21.2", default-features = false, features = ["sync"] }
-wasmtime-vfs-ledger = { path = "../ledger" }
-async-trait = "0.1.51"
-wasi-common = "2.0.0"
+async-trait = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+wasi-common = { workspace = true }
+wasmtime-vfs-ledger = { workspace = true }
