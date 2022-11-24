@@ -70,11 +70,12 @@ impl Node for File {
 }
 
 impl File {
-    pub fn new(parent: Arc<dyn Node>) -> Arc<Self> {
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(parent: Arc<dyn Node>) -> Arc<dyn Node> {
         Self::with_data(parent, [])
     }
 
-    pub fn with_data(parent: Arc<dyn Node>, data: impl Into<Vec<u8>>) -> Arc<Self> {
+    pub fn with_data(parent: Arc<dyn Node>, data: impl Into<Vec<u8>>) -> Arc<dyn Node> {
         let id = parent.id().device().create_inode();
 
         let inode = Inode {

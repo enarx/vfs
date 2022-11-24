@@ -204,7 +204,7 @@ impl Trust {
         let public = T::decode(&bytes[4..])?;
         let uuid = uuid::Uuid::new_v4();
 
-        let d = Directory::new(parent.clone());
+        let d = Directory::new(parent.clone(), None);
         d.attach("verify", Verify::new(d.clone(), public)).await?;
         d.attach("share", Share::new(d.clone(), bytes)).await?;
         parent.attach(&uuid.to_string(), d).await?;

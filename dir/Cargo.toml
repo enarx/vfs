@@ -6,9 +6,9 @@ edition = "2021"
 [dependencies]
 async-trait = { workspace = true }
 wasi-common = { workspace = true }
-wasmtime-vfs-file = { workspace = true }
 wasmtime-vfs-ledger = { workspace = true }
 wasmtime-vfs-memory = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
+wasmtime-vfs-file = { workspace = true }
