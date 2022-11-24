@@ -66,12 +66,12 @@ a.file b.dir
     ];
 
     // Construct the tmpfs tree.
-    let root = Directory::root(Ledger::new());
+    let root = Directory::root(Ledger::new(), Some(Arc::new(File::new)));
     for (path, data) in tree {
         let parent = root.get(path.rsplit_once('/').unwrap().0).await.unwrap();
         let child: Arc<dyn Node> = match data {
             Some(data) => File::with_data(parent, *data),
-            None => Directory::new(parent),
+            None => Directory::new(parent, Some(Arc::new(File::new))),
         };
 
         root.attach(path, child).await.unwrap();

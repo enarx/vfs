@@ -297,7 +297,7 @@ impl Generate {
         let shared = public.encode(())?;
         let uuid = uuid::Uuid::new_v4();
 
-        let d = Directory::new(parent.clone());
+        let d = Directory::new(parent.clone(), None);
         d.attach("verify", Verify::new(d.clone(), public)).await?;
         d.attach("share", Share::new(d.clone(), shared)).await?;
         d.attach("sign", Sign::new(d.clone(), secret)).await?;

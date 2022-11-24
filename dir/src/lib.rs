@@ -8,27 +8,44 @@ use std::sync::{Arc, Weak};
 use wasi_common::dir::{ReaddirCursor, ReaddirEntity};
 use wasi_common::file::{Advice, FdFlags, FileType, Filestat, OFlags};
 use wasi_common::{Error, ErrorExt, SystemTimeSpec, WasiDir, WasiFile};
-use wasmtime_vfs_file::File;
-use wasmtime_vfs_ledger::{InodeId, Ledger};
-use wasmtime_vfs_memory::{Inode, Link, Node, Open, State};
+use wasmtime_vfs_ledger::{DeviceId, InodeId, Ledger};
+use wasmtime_vfs_memory::{Link, Node, Open, State};
 
-pub struct Directory(Link<BTreeMap<String, Arc<dyn Node>>>);
+type NodeConstructor = Arc<dyn Fn(Arc<dyn Node>) -> Arc<dyn Node> + Send + Sync>;
+
+/// A directory generic in file [`Node`] constructor
+pub struct Directory {
+    nodes: Link<BTreeMap<String, Arc<dyn Node>>>,
+    create_file: Option<NodeConstructor>,
+}
 
 impl Deref for Directory {
     type Target = Link<BTreeMap<String, Arc<dyn Node>>>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.nodes
     }
 }
 
 impl DerefMut for Directory {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.nodes
     }
 }
 
 impl Directory {
+    fn new_at(
+        parent: Weak<dyn Node>,
+        device_id: Arc<DeviceId>,
+        create_file: Option<NodeConstructor>,
+    ) -> Arc<Self> {
+        let nodes = Link {
+            parent,
+            inode: Arc::new(device_id.create_inode().into()),
+        };
+        Self { nodes, create_file }.into()
+    }
+
     fn prev(self: &Arc<Self>) -> Arc<dyn Node> {
         match self.parent.upgrade() {
             Some(parent) => parent,
@@ -36,28 +53,20 @@ impl Directory {
         }
     }
 
-    pub fn device(parent: Arc<dyn Node>) -> Arc<Self> {
-        let id = parent.id().device().ledger().create_device().create_inode();
-        Arc::new(Self(Link {
-            parent: Arc::downgrade(&parent),
-            inode: Inode::from(id).into(),
-        }))
+    pub fn device(parent: Arc<dyn Node>, create_file: Option<NodeConstructor>) -> Arc<Self> {
+        Self::new_at(
+            Arc::downgrade(&parent),
+            parent.id().device().ledger().create_device(),
+            create_file,
+        )
     }
 
-    pub fn root(ledger: Arc<Ledger>) -> Arc<Self> {
-        let id = ledger.create_device().create_inode();
-        Arc::new(Self(Link {
-            parent: Weak::<Self>::new(),
-            inode: Inode::from(id).into(),
-        }))
+    pub fn root(ledger: Arc<Ledger>, create_file: Option<NodeConstructor>) -> Arc<Self> {
+        Self::new_at(Weak::<Self>::new(), ledger.create_device(), create_file)
     }
 
-    pub fn new(parent: Arc<dyn Node>) -> Arc<Self> {
-        let id = parent.id().device().create_inode();
-        Arc::new(Self(Link {
-            parent: Arc::downgrade(&parent),
-            inode: Inode::from(id).into(),
-        }))
+    pub fn new(parent: Arc<dyn Node>, create_file: Option<NodeConstructor>) -> Arc<Self> {
+        Self::new_at(Arc::downgrade(&parent), parent.id().device(), create_file)
     }
 
     pub async fn get(self: &Arc<Self>, path: &str) -> Result<Arc<dyn Node>, Error> {
@@ -226,9 +235,13 @@ impl WasiDir for OpenDir {
 
                     // If the file doesn't exist, create it.
                     (None, true) => {
-                        let child: Arc<dyn Node> = match oflags.contains(OFlags::DIRECTORY) {
-                            true => Directory::new(self.link.clone()),
-                            false => File::new(self.link.clone()),
+                        let link = self.link.clone();
+                        let child: Arc<dyn Node> = if oflags.contains(OFlags::DIRECTORY) {
+                            Directory::new(link, self.link.create_file.clone())
+                        } else if let Some(ref create_file) = self.link.create_file {
+                            create_file(link)
+                        } else {
+                            return Err(Error::not_supported());
                         };
 
                         ilock.content.insert(name.into(), child.clone());
@@ -281,7 +294,8 @@ impl WasiDir for OpenDir {
                 match ilock.content.contains_key(name) {
                     true => Err(Error::exist()),
                     false => {
-                        let child = Directory::new(self.link.clone());
+                        let child =
+                            Directory::new(self.link.clone(), self.link.create_file.clone());
                         ilock.content.insert(name.into(), child);
                         Ok(())
                     }
@@ -622,15 +636,16 @@ impl WasiFile for OpenDir {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     use std::io::IoSliceMut;
     use std::path::MAIN_SEPARATOR as SEP;
     use std::sync::Arc;
 
     use wasi_common::file::{FdFlags, FileType, OFlags};
+    use wasmtime_vfs_file::File;
     use wasmtime_vfs_ledger::Ledger;
     use wasmtime_vfs_memory::Node;
-
-    use super::{Directory, File};
 
     #[tokio::test]
     async fn test() {
@@ -645,12 +660,12 @@ mod test {
             ("/zip", Some(b"abc")),
         ];
 
-        let dir = Directory::root(Ledger::new());
+        let dir = Directory::root(Ledger::new(), None);
         for (path, data) in FILES {
             let parent = dir.get(path.rsplit_once(SEP).unwrap().0).await.unwrap();
             let child: Arc<dyn Node> = match data {
                 Some(data) => File::with_data(parent, *data),
-                None => Directory::new(parent),
+                None => Directory::new(parent, Some(Arc::new(File::new))),
             };
 
             dir.attach(path, child).await.unwrap()

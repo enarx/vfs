@@ -25,7 +25,7 @@ pub const ES384: &[u8] = b"\x00\x00\x00\x08";
 pub const ES512: &[u8] = b"\x00\x00\x00\x09";
 
 pub async fn new(parent: Arc<dyn Node>) -> Result<Arc<dyn Node>, Error> {
-    let dir = Directory::device(parent);
+    let dir = Directory::device(parent, None);
     dir.attach("generate", Generate::new(dir.clone())).await?;
     dir.attach("trust", Trust::new(dir.clone())).await?;
     Ok(dir)
@@ -44,7 +44,7 @@ mod test {
     use super::*;
 
     async fn root(ledger: Arc<Ledger>) -> Result<Arc<dyn Node>, Error> {
-        let dir = Directory::root(ledger);
+        let dir = Directory::root(ledger, None);
         dir.attach("generate", Generate::new(dir.clone())).await?;
         dir.attach("trust", Trust::new(dir.clone())).await?;
         Ok(dir)
