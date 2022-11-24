@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-wasmtime-vfs-ledger = { path = "../ledger" }
-wasmtime-vfs-memory = { path = "../memory" }
-wasmtime-vfs-file = { path = "../file" }
-async-trait = "0.1.51"
-wasi-common = "2.0.0"
+async-trait = { workspace = true }
+wasi-common = { workspace = true }
+wasmtime-vfs-file = { workspace = true }
+wasmtime-vfs-ledger = { workspace = true }
+wasmtime-vfs-memory = { workspace = true }
 
 [dev-dependencies]
-tokio = { version = "1.21.2", default-features = false, features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt"] }
