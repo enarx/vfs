@@ -90,15 +90,16 @@ impl Directory {
             }
         };
 
-        let mut ilock = this.inode.data.write().await;
-
         match name {
             "" | "." | ".." => Err(Error::invalid_argument()),
-            name if ilock.content.contains_key(name) => Err(Error::exist()),
-            name => {
-                ilock.content.insert(name.to_owned(), node);
-                Ok(())
-            }
+            name => this
+                .inode
+                .data
+                .write()
+                .await
+                .content
+                .try_insert(name.to_owned(), node)
+                .map_or_else(|_| Error::exist(), |_| ()),
         }
     }
 }
@@ -277,15 +278,15 @@ impl WasiDir for OpenDir {
         match path {
             "" | "." | ".." => Err(Error::invalid_argument()),
             name => {
-                let mut ilock = self.link.inode.data.write().await;
-                match ilock.content.contains_key(name) {
-                    true => Err(Error::exist()),
-                    false => {
-                        let child = Directory::new(self.link.clone());
-                        ilock.content.insert(name.into(), child);
-                        Ok(())
-                    }
-                }
+                let child = Directory::new(self.link.clone());
+                self.link
+                    .inode
+                    .data
+                    .write()
+                    .await
+                    .content
+                    .try_insert(name, child)
+                    .map_or_else(|_| Error::exist(), |_| ())
             }
         }
     }
