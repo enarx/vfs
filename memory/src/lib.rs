@@ -18,6 +18,7 @@ pub trait Node: 'static + Any + Send + Sync {
 
     async fn open_file(
         self: Arc<Self>,
+        path: &str,
         dir: bool,
         read: bool,
         write: bool,

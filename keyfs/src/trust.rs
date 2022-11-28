@@ -145,6 +145,7 @@ impl Node for Trust {
 
     async fn open_file(
         self: Arc<Self>,
+        _path: &str,
         dir: bool,
         read: bool,
         write: bool,
