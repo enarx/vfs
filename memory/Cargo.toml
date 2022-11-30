@@ -2,8 +2,13 @@
 name = "wasmtime-vfs-memory"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Tooling for building in-memory WASI file systems"
+authors = ["The Enarx Project Developers"]
+homepage = "https://enarx.dev/"
+repository = "https://github.com/enarx/vfs"
+license = "Apache-2.0"
+keywords = ["vfs"]
+categories = ["filesystem"]
 
 [dependencies]
 async-trait = { workspace = true }
