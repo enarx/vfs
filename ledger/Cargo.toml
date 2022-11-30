@@ -2,3 +2,10 @@
 name = "wasmtime-vfs-ledger"
 version = "0.1.0"
 edition = "2021"
+description = "WASI file system ledger"
+authors = ["The Enarx Project Developers"]
+homepage = "https://enarx.dev/"
+repository = "https://github.com/enarx/vfs"
+license = "Apache-2.0"
+keywords = ["vfs"]
+categories = ["filesystem"]
