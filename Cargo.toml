@@ -53,8 +53,8 @@ uuid = "1.1.2"
 wash = { version = "0.1.0", git = "https://github.com/rvolosatovs/wash", artifact = "bin", target = "wasm32-wasi", default-features = false }
 wasi-common = "2.0.0"
 wasmtime = "2.0.0"
-wasmtime-vfs-dir = { path = "./dir" }
-wasmtime-vfs-file = { path = "./file" }
-wasmtime-vfs-ledger = { path = "./ledger" }
-wasmtime-vfs-memory = { path = "./memory" }
+wasmtime-vfs-dir = { path = "./dir", version = "0.1.0" }
+wasmtime-vfs-file = { path = "./file", version = "0.1.0" }
+wasmtime-vfs-ledger = { path = "./ledger", version = "0.1.0" }
+wasmtime-vfs-memory = { path = "./memory", version = "0.1.0" }
 wasmtime-wasi = "2.0.0"
