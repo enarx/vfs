@@ -2,7 +2,7 @@ use std::any::Any;
 use std::collections::BTreeMap;
 use std::io::{IoSlice, IoSliceMut, SeekFrom};
 use std::ops::{Deref, DerefMut};
-use std::path::{PathBuf, MAIN_SEPARATOR as SEP};
+use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 
 use wasi_common::dir::{ReaddirCursor, ReaddirEntity};
@@ -72,7 +72,7 @@ impl Directory {
     pub async fn get(self: &Arc<Self>, path: &str) -> Result<Arc<dyn Node>, Error> {
         let mut this: Arc<dyn Node> = self.clone();
 
-        for seg in path.trim_end_matches(SEP).split(SEP) {
+        for seg in path.trim_end_matches('/').split('/') {
             this = match seg {
                 "" | "." => continue,
                 ".." => self.prev(),
@@ -89,8 +89,8 @@ impl Directory {
     }
 
     pub async fn attach(self: &Arc<Self>, path: &str, node: Arc<dyn Node>) -> Result<(), Error> {
-        let path = path.trim_end_matches(SEP);
-        let (this, name) = match path.rsplit_once(SEP) {
+        let path = path.trim_end_matches('/');
+        let (this, name) = match path.rsplit_once('/') {
             None => (self.clone(), path),
             Some((lhs, rhs)) => {
                 let any = self.get(lhs).await?.to_any();
@@ -195,7 +195,7 @@ impl WasiDir for OpenDir {
         ];
 
         // Descend into the path.
-        if let Some((lhs, rhs)) = path.split_once(SEP) {
+        if let Some((lhs, rhs)) = path.split_once('/') {
             let child = self.open_dir(follow, lhs).await?;
             return child
                 .open_file(follow, rhs, oflags, read, write, flags)
@@ -272,7 +272,7 @@ impl WasiDir for OpenDir {
     }
 
     async fn open_dir(&self, follow: bool, path: &str) -> Result<Box<dyn WasiDir>, Error> {
-        if let Some((lhs, rhs)) = path.split_once(SEP) {
+        if let Some((lhs, rhs)) = path.split_once('/') {
             let child = self.open_dir(follow, lhs).await?;
             return child.open_dir(follow, rhs).await;
         }
@@ -291,7 +291,7 @@ impl WasiDir for OpenDir {
     }
 
     async fn create_dir(&self, path: &str) -> Result<(), Error> {
-        if let Some((lhs, rhs)) = path.split_once(SEP) {
+        if let Some((lhs, rhs)) = path.split_once('/') {
             let child = self.open_dir(true, lhs).await?;
             return child.create_dir(rhs).await;
         }
@@ -355,7 +355,7 @@ impl WasiDir for OpenDir {
     }
 
     async fn symlink(&self, old_path: &str, new_path: &str) -> Result<(), Error> {
-        if let Some((lhs, rhs)) = new_path.split_once(SEP) {
+        if let Some((lhs, rhs)) = new_path.split_once('/') {
             let child = self.open_dir(true, lhs).await?;
             return child.symlink(old_path, rhs).await;
         }
@@ -371,7 +371,7 @@ impl WasiDir for OpenDir {
     // behavior would be odd. Therefore, we only remove child directories if
     // the child is also a `Directory` AND has the same device id.
     async fn remove_dir(&self, path: &str) -> Result<(), Error> {
-        if let Some((lhs, rhs)) = path.split_once(SEP) {
+        if let Some((lhs, rhs)) = path.split_once('/') {
             let child = self.open_dir(true, lhs).await?;
             return child.remove_dir(rhs).await;
         }
@@ -406,7 +406,7 @@ impl WasiDir for OpenDir {
 
     // The same comments for `remove_dir` apply here.
     async fn unlink_file(&self, path: &str) -> Result<(), Error> {
-        if let Some((lhs, rhs)) = path.split_once(SEP) {
+        if let Some((lhs, rhs)) = path.split_once('/') {
             let child = self.open_dir(true, lhs).await?;
             return child.unlink_file(rhs).await;
         }
@@ -433,7 +433,7 @@ impl WasiDir for OpenDir {
     }
 
     async fn read_link(&self, path: &str) -> Result<PathBuf, Error> {
-        if let Some((lhs, rhs)) = path.split_once(SEP) {
+        if let Some((lhs, rhs)) = path.split_once('/') {
             let child = self.open_dir(true, lhs).await?;
             return child.read_link(rhs).await;
         }
@@ -457,7 +457,7 @@ impl WasiDir for OpenDir {
     }
 
     async fn get_path_filestat(&self, path: &str, follow: bool) -> Result<Filestat, Error> {
-        if let Some((lhs, rhs)) = path.split_once(SEP) {
+        if let Some((lhs, rhs)) = path.split_once('/') {
             let child = self.open_dir(true, lhs).await?;
             return child.get_path_filestat(rhs, follow).await;
         }
@@ -483,7 +483,7 @@ impl WasiDir for OpenDir {
         dest_dir: &dyn WasiDir,
         dest_path: &str,
     ) -> Result<(), Error> {
-        if let Some((lhs, rhs)) = path.split_once(SEP) {
+        if let Some((lhs, rhs)) = path.split_once('/') {
             let child = self.open_dir(true, lhs).await?;
             return child.rename(rhs, dest_dir, dest_path).await;
         }
@@ -497,7 +497,7 @@ impl WasiDir for OpenDir {
         target_dir: &dyn WasiDir,
         target_path: &str,
     ) -> Result<(), Error> {
-        if let Some((lhs, rhs)) = path.split_once(SEP) {
+        if let Some((lhs, rhs)) = path.split_once('/') {
             let child = self.open_dir(true, lhs).await?;
             return child.hard_link(rhs, target_dir, target_path).await;
         }
@@ -512,7 +512,7 @@ impl WasiDir for OpenDir {
         mtime: Option<SystemTimeSpec>,
         follow: bool,
     ) -> Result<(), Error> {
-        if let Some((lhs, rhs)) = path.split_once(SEP) {
+        if let Some((lhs, rhs)) = path.split_once('/') {
             let child = self.open_dir(true, lhs).await?;
             return child.set_times(rhs, atime, mtime, follow).await;
         }
@@ -650,7 +650,6 @@ mod test {
     use super::*;
 
     use std::io::IoSliceMut;
-    use std::path::MAIN_SEPARATOR as SEP;
     use std::sync::Arc;
 
     use wasi_common::file::{FdFlags, FileType, OFlags};
@@ -673,7 +672,7 @@ mod test {
 
         let dir = Directory::root(Ledger::new(), None);
         for (path, data) in FILES {
-            let parent = dir.get(path.rsplit_once(SEP).unwrap().0).await.unwrap();
+            let parent = dir.get(path.rsplit_once('/').unwrap().0).await.unwrap();
             let child: Arc<dyn Node> = match data {
                 Some(data) => File::with_data(parent, *data),
                 None => Directory::new(parent, Some(Arc::new(File::new))),
