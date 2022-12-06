@@ -1,6 +1,6 @@
 [package]
 name = "wasmtime-vfs-dir"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "In-memory WASI directory"
 authors = ["The Enarx Project Developers"]
