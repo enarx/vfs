@@ -2,8 +2,8 @@ use super::{Noop, Surround, Tee};
 
 use anyhow::{bail, Context};
 use wasi_common::pipe::{ReadPipe, WritePipe};
-use wasi_common::{WasiDir, WasiFile};
-use wasmtime::{Engine, Linker, Module, Store, Trap};
+use wasi_common::{I32Exit, WasiDir, WasiFile};
+use wasmtime::{Engine, Linker, Module, Store};
 use wasmtime_wasi::{stdio, WasiCtxBuilder};
 
 pub async fn wash(
@@ -80,8 +80,7 @@ pub async fn wash(
             .typed::<(), (), _>(&store)
             .context("failed to assert default function type")?
             .call(&mut store, ())
-            .as_ref()
-            .map_err(Trap::i32_exit_status)
+            .map_err(|e| e.downcast().map(|I32Exit(code)| code))
             .expect_err("`wash` did not set an exit code, did you forget to execute `exit`?")
             .context("failed to execute default function")?
     };
