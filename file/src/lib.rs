@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use wasi_common::file::{Advice, FdFlags, FileType, Filestat};
-use wasi_common::{Error, ErrorExt, ErrorKind, SystemTimeSpec, WasiDir, WasiFile};
+use wasi_common::{Error, ErrorExt, SystemTimeSpec, WasiDir, WasiFile};
 use wasmtime_vfs_ledger::InodeId;
 use wasmtime_vfs_memory::{Data, Inode, Link, Node, Open, State};
 
@@ -295,16 +295,17 @@ impl WasiFile for OpenFile {
             SeekFrom::Current(_) => i64::try_from(olock.pos),
             SeekFrom::Start(_) => Ok(0),
             SeekFrom::End(_) => i64::try_from(ilock.content.len()),
-        };
+        }
+        .map_err(|e| Error::invalid_argument().context(e))?;
 
         let off = match pos {
             SeekFrom::Current(off) => Ok(off),
             SeekFrom::Start(off) => i64::try_from(off),
             SeekFrom::End(off) => Ok(off),
-        };
+        }
+        .map_err(|e| Error::invalid_argument().context(e))?;
 
-        let pos = cur.map_err(|_| ErrorKind::Inval)? + off.map_err(|_| ErrorKind::Inval)?;
-        let pos = usize::try_from(pos).map_err(|_| ErrorKind::Inval)?;
+        let pos = usize::try_from(cur + off).map_err(|e| Error::invalid_argument().context(e))?;
         olock.pos = pos;
 
         Ok(pos as u64)

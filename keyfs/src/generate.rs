@@ -373,7 +373,7 @@ impl WasiFile for OpenGenerate {
             return Ok(total as u64);
         }
 
-        Err(ErrorKind::WouldBlk.into())
+        Err(std::io::Error::from(std::io::ErrorKind::WouldBlock).into())
     }
 
     async fn write_vectored<'a>(&mut self, bufs: &[IoSlice<'a>]) -> Result<u64, Error> {
