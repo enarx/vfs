@@ -105,14 +105,14 @@ mod test {
             .unwrap();
 
         // Open the share file.
-        let mut share = open_file(&*keys, &format!("{}/share", uuid), true, false).await;
+        let mut share = open_file(&*keys, &format!("{uuid}/share"), true, false).await;
 
         // Export the public key.
         let pubkey: [u8; 69] = read(&mut *share, false).await;
         let pubkey = p256::PublicKey::from_sec1_bytes(&pubkey[4..]).unwrap();
 
         // Open the sign socket.
-        let mut sign = open_file(&*keys, &format!("{}/sign", uuid), true, true).await;
+        let mut sign = open_file(&*keys, &format!("{uuid}/sign"), true, true).await;
 
         // Sign the message.
         write(&mut *sign, &[b"foo"], false).await.unwrap();
@@ -151,7 +151,7 @@ mod test {
             .unwrap();
 
         // Open the verify socket.
-        let mut verify = open_file(&*keys, &format!("{}/verify", uuid), false, true).await;
+        let mut verify = open_file(&*keys, &format!("{uuid}/verify"), false, true).await;
 
         // Verify the message.
         write(&mut *verify, &[b"foo"], false).await.unwrap();
