@@ -6,4 +6,5 @@ jobs:
   auto-merge:
     permissions:
       pull-requests: write
+      contents: write
     uses: enarx/.github/.github/workflows/automerge.yml@main
